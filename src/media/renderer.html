@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>{{TITLE}}</title>
+
+<style>
+:root {
+  --bg: #1e1e1e;
+  --fg: #cccccc;
+  --accent: #007acc;
+}
+
+body.light {
+  --bg: #ffffff;
+  --fg: #000000;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: monospace;
+}
+
+.navbar {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid #333;
+  gap: 8px;
+}
+
+.title {
+  flex: 1;
+  font-weight: bold;
+}
+
+button {
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid #555;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+button.active {
+  border-color: var(--accent);
+}
+
+.canvas {
+  padding: 10px;
+  overflow: auto;
+}
+
+.grid {
+  display: grid;
+  font-family: monospace;
+}
+
+.cell {
+  width: 0.6em;
+  height: 1.2em;
+}
+
+.field {
+  background: rgba(0, 122, 204, 0.15);
+}
+
+pre {
+  white-space: pre;
+}
+</style>
+</head>
+
+<body>
+<div class="navbar">
+  <div class="title">{{TITLE}}</div>
+  <button id="renderBtn" class="active">Render</button>
+  <button id="sourceBtn">Source</button>
+  <button id="themeBtn">☀︎ / ☾</button>
+</div>
+
+<div class="canvas">
+  <div id="renderView"></div>
+  <pre id="sourceView" style="display:none;"></pre>
+</div>
+
+<script>
+const bmsSource = "{{SOURCE}}";
+const renderView = document.getElementById('renderView');
+const sourceView = document.getElementById('sourceView');
+sourceView.textContent = bmsSource;
+
+/* ---------------------------
+   PARSE MAP (DFHMDI)
+--------------------------- */
+function parseMap(source) {
+  const size = source.match(/SIZE=\((\d+),(\d+)\)/);
+  const line = source.match(/LINE=(\d+)/);
+  const col  = source.match(/COLUMN=(\d+)/);
+
+  return {
+    rows: size ? +size[1] : 24,
+    cols: size ? +size[2] : 80,
+    line: line ? +line[1] : 1,
+    column: col ? +col[1] : 1
+  };
+}
+
+/* ---------------------------
+   PARSE FIELDS (DFHMDF)
+--------------------------- */
+function parseFields(source) {
+  const fields = [];
+  const regex = /^(\w{1,7})\s+DFHMDF([\s\S]*?)(?=^\w{1,7}\s+DFHMDF|\Z)/gm;
+
+  let match;
+  while ((match = regex.exec(source))) {
+    const body = match[2];
+
+    const pos = body.match(/POS=\((\d+),(\d+)\)/);
+    const len = body.match(/LENGTH=(\d+)/);
+    const init = body.match(/INITIAL='([^']*)'/);
+
+    if (pos && len) {
+      fields.push({
+        row: +pos[1] - 1,
+        col: +pos[2] - 1,
+        length: +len[1],
+        text: init ? init[1] : ''
+      });
+    }
+  }
+
+  return fields;
+}
+
+/* ---------------------------
+   CREATE GRID
+--------------------------- */
+function createGrid(def) {
+  const grid = document.createElement('div');
+  grid.className = 'grid';
+  grid.style.gridTemplateRows = `repeat(${def.rows}, 1.2em)`;
+  grid.style.gridTemplateColumns = `repeat(${def.cols}, 0.6em)`;
+
+  const cells = [];
+  for (let i = 0; i < def.rows * def.cols; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.textContent = ' ';
+    grid.appendChild(cell);
+    cells.push(cell);
+  }
+
+  return { grid, cells };
+}
+
+/* ---------------------------
+   APPLY FIELDS
+--------------------------- */
+function applyFields(cells, def, fields) {
+  fields.forEach(f => {
+    for (let i = 0; i < f.length; i++) {
+      const idx = (f.row * def.cols) + f.col + i;
+      if (!cells[idx]) return;
+
+      cells[idx].textContent = f.text[i] || ' ';
+      cells[idx].classList.add('field');
+    }
+  });
+}
+
+/* ---------------------------
+   RENDER
+--------------------------- */
+function render() {
+  renderView.innerHTML = '';
+
+  const map = parseMap(bmsSource);
+  const fields = parseFields(bmsSource);
+  const { grid, cells } = createGrid(map);
+
+  applyFields(cells, map, fields);
+  renderView.appendChild(grid);
+}
+
+render();
+
+/* ---------------------------
+   UI CONTROLS
+--------------------------- */
+document.getElementById('renderBtn').onclick = () => {
+  renderView.style.display = 'block';
+  sourceView.style.display = 'none';
+};
+
+document.getElementById('sourceBtn').onclick = () => {
+  renderView.style.display = 'none';
+  sourceView.style.display = 'block';
+};
+
+document.getElementById('themeBtn').onclick = () => {
+  document.body.classList.toggle('light');
+};
+</script>
+</body>
+</html>

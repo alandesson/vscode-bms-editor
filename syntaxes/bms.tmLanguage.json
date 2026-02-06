@@ -1,0 +1,106 @@
+{
+    "scopeName": "source.bms",
+    "fileTypes": ["bms"],
+    "name": "BMS",
+    "patterns": [
+        { "include": "#comments" },
+        { "include": "#column" },
+        { "include": "#label" },
+        { "include": "#strings" },
+        { "include": "#keywords" },
+        { "include": "#attributes" },
+        { "include": "#constants" },
+        { "include": "#numbers" }
+    ],
+    "repository": {  
+        "keywords": {
+            "patterns": [
+                {
+                    "match": "\\b(DFHMSD|DFHMDI|DFHMDF|END)\\b",
+                    "name": "keyword.control.bms"
+                }
+            ]
+        },
+        "attributes": {
+            "patterns": [
+                {
+                    "match": "\\b(TYPE|MODE|LANG|STORAGE|CTRL|EXTATT|TERM|TIOAPFX|OUTLINE|PS|SOSI|MAPATTS|DSATTS|SIZE|COLUMN|LINE|POS|LENGTH|INITIAL|ATTRB|HILIGHT|COLOR)\\b",
+                    "name": "variable.parameter.bms"
+                }
+            ]
+        },
+        "strings": {
+            "begin": "'",
+            "beginCaptures": {
+                "0": {
+                    "name": "punctuation.definition.string.begin.bms"
+                }
+            },
+            "end": "'",
+            "endCaptures": {
+                "0": {
+                    "name": "punctuation.definition.string.end.bms"
+                }
+            },
+            "name": "string.quoted.single.bms",
+            "patterns": [
+                {
+                    "match": "\\\\.",
+                    "name": "constant.character.escape.bms"
+                }
+            ]
+        },
+        "constants": {
+            "patterns": [
+                {
+                    "match": "\\b(TRUE|3270-2|FALSE|ON|OFF|NULL|ASKIP|NORM|UNPROT|PROT|BRT|FINAL|FREEKB|AUTO|COBOL|INOUT|YES|NO)\\b",
+                    "name": "constant.language.bms"
+                },
+                {
+                    "match": "([&][A-Za-z0-9_-]+)",
+                    "captures": {
+                        "1": {
+                            "name": "string.regexp.simbolic.bms"
+                        }
+                    }
+                },
+                {
+                    "match": "\\b(BLUE|GREEN|WHITE|CYAN|RED|YELLOW|MAGENTA|BLACK)\\b",
+                    "name": "constant.language.color.bms"
+                }
+            ]
+        },
+        "numbers": {
+            "patterns": [
+                {
+                    "match": "\\b\\d+(,\\d+)*\\b",
+                    "name": "constant.numeric.bms"
+                }
+            ]
+        },
+        "comments": {
+            "patterns": [
+                {
+                    "match": "^\\*.*$",
+                    "name": "comment.line.bms"
+                }
+            ]
+        },
+        "column": {
+            "patterns": [
+                {
+                    "match": "(?<=^.{71})X",
+                    "name": "string.regexp.continuar.bms"
+                }
+            ]
+        },
+        "label": {
+            "patterns": [
+                {
+                "match": "^(?!\\s)(?!DFHMSD\\b|DFHMDI\\b|DFHMDF\\b|END\\b)(?!TYPE\\b|MODE\\b|LANG\\b|STORAGE\\b|CTRL\\b|EXTATT\\b|TERM\\b|TIOAPFX\\b|OUTLINE\\b|PS\\b|SOSI\\b|MAPATTS\\b|DSATTS\\b|SIZE\\b|COLUMN\\b|LINE\\b|POS\\b|LENGTH\\b|INITIAL\\b|ATTRB\\b|HILIGHT\\b|COLOR\\b)[A-Za-z0-9_-]{1,7}\\b",
+                "name": "support.function.label.bms"
+                }
+            ]
+        }
+    }
+}
