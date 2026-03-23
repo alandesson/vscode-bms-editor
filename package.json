@@ -19,12 +19,26 @@
           "when": "resourceLangId == bms",
           "group": "navigation"
         }
+      ],
+      "explorer/context": [
+        {
+          "command": "bms-renderer.render",
+          "when": "resourceExtname == .bms",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "bms-renderer.render",
+          "when": "resourceLangId == bms",
+          "group": "navigation"
+        }
       ]
     },
     "commands": [
       {
         "command": "bms-renderer.render",
-        "title": "Render BMS"
+        "title": "Open BMS Renderer"
       }
     ],
     "languages": [

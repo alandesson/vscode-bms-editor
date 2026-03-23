@@ -47,13 +47,18 @@ export function activate(context: vscode.ExtensionContext) {
 	// --------------------------
 	const renderCommand = vscode.commands.registerCommand(
 		'bms-renderer.render',
-		() => {
-			const editor = vscode.window.activeTextEditor;
-			if (!editor || editor.document.languageId !== 'bms') {
-				return;
+		async (uri?: vscode.Uri) => {
+			let document: vscode.TextDocument;
+			if (uri) {
+				document = await vscode.workspace.openTextDocument(uri);
+			} else {
+				const editor = vscode.window.activeTextEditor;
+				if (!editor || editor.document.languageId !== 'bms') {
+					return;
+				}
+				document = editor.document;
 			}
-
-			openBmsRenderer(context, editor.document);
+			openBmsRenderer(context, document);
 		}
 	);
 

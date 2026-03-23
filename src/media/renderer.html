@@ -3,207 +3,1842 @@
 <head>
 <meta charset="UTF-8" />
 <title>{{TITLE}}</title>
-
 <style>
-:root {
-  --bg: #1e1e1e;
-  --fg: #cccccc;
-  --accent: #007acc;
-}
+/* =====================================================
+   VSCode integration: inherit editor theme variables.
+   The navbar and panels use VSCode's CSS variables so
+   they follow the active theme automatically.
+   The grid area uses its own fixed palette so it
+   always looks like a terminal screen.
+   ===================================================== */
 
-body.light {
-  --bg: #ffffff;
-  --fg: #000000;
-}
-
+/* ---------- navbar / shell (VSCode themed) ---------- */
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--fg);
-  font-family: monospace;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--vscode-editor-background);
+  color: var(--vscode-editor-foreground);
+  font-family: var(--vscode-font-family, monospace);
+  font-size: var(--vscode-font-size, 13px);
 }
 
 .navbar {
   display: flex;
   align-items: center;
-  padding: 6px 10px;
-  border-bottom: 1px solid #333;
-  gap: 8px;
+  flex-shrink: 0;
+  padding: 4px 10px;
+  gap: 6px;
+  background: var(--vscode-editor-background);
+  border-bottom: 1px solid var(--vscode-panel-border, #444);
 }
 
-.title {
+.navbar .title {
   flex: 1;
   font-weight: bold;
+  color: var(--vscode-editor-foreground);
 }
 
-button {
-  background: transparent;
-  color: var(--fg);
-  border: 1px solid #555;
-  padding: 4px 8px;
+/* VSCode-style buttons */
+.vsc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  border: 1px solid var(--vscode-button-border, transparent);
+  background: var(--vscode-button-secondaryBackground, transparent);
+  color: var(--vscode-button-secondaryForeground, var(--vscode-editor-foreground));
+  font-family: inherit;
+  font-size: inherit;
+  border-radius: 2px;
+  line-height: 1.6;
+}
+.vsc-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground, rgba(128,128,128,0.15));
+}
+.vsc-btn.active {
+  background: var(--vscode-button-background, #0078d4);
+  color: var(--vscode-button-foreground, #fff);
+  border-color: var(--vscode-button-background, #0078d4);
+}
+
+/* VSCode-style select */
+.vsc-select {
+  background: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  border: 1px solid var(--vscode-dropdown-border);
+  padding: 2px 4px;
+  font-family: inherit;
+  font-size: inherit;
+  border-radius: 2px;
   cursor: pointer;
 }
 
-button.active {
-  border-color: var(--accent);
+/* VSCode-style input */
+.vsc-input {
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, #555);
+  padding: 2px 6px;
+  font-family: inherit;
+  font-size: inherit;
+  border-radius: 2px;
+  width: 80px;
+}
+.vsc-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.canvas {
-  padding: 10px;
+/* ---------- scroll area ---------- */
+.canvas-area {
+  flex: 1;
   overflow: auto;
+  padding: 10px;
+  position: relative;
 }
 
-.grid {
-  display: grid;
-  font-family: monospace;
-}
-
-.cell {
-  width: 0.6em;
-  height: 1.2em;
-}
-
-.field {
-  background: rgba(0, 122, 204, 0.15);
-}
-
-pre {
+/* ---------- source view ---------- */
+#sourceView {
   white-space: pre;
+  display: none;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: var(--vscode-editor-font-size, 13px);
+  color: var(--vscode-editor-foreground);
+}
+
+/* ---------- grid wrapper: own background ---------- */
+.grid-wrapper {
+  position: relative;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  border: 2px solid var(--grid-border, rgba(128,128,128,0.4));
+}
+
+/* The grid itself uses terminal-like fixed colors */
+.bms-grid {
+  display: grid;
+  font-family: 'Courier New', Courier, monospace;
+  background: var(--grid-bg);
+  color: var(--grid-fg);
+  user-select: none;
+  position: relative;
+}
+
+/* Selection overlay canvas (absolutely positioned over grid) */
+#selectionOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.grid-cell {
+  overflow: hidden;
+  box-sizing: border-box;
+  white-space: pre;
+  /* width/height controlled by grid track size, set in JS */
+}
+
+/* Field cell: slightly highlighted background by default */
+.grid-cell.is-field {
+  cursor: pointer;
+}
+
+/* ---------- bottom panel (VSCode themed) ---------- */
+#fieldPanel {
+  flex-shrink: 0;
+  display: none;
+  padding: 6px 12px;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--vscode-panel-border, #444);
+  background: var(--vscode-panel-background, var(--vscode-editor-background));
+  color: var(--vscode-panel-foreground, var(--vscode-editor-foreground));
+  font-size: 12px;
+}
+
+.panel-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.panel-label {
+  color: var(--vscode-descriptionForeground, #888);
+  font-size: 11px;
+}
+
+/* ---- Custom color picker ---- */
+.color-picker {
+  position: relative;
+  display: inline-flex;
+}
+
+.color-picker-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 110px;
+  text-align: left;
+}
+
+.cp-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  border: 1px solid rgba(128,128,128,0.5);
+  flex-shrink: 0;
+}
+
+.cp-swatch-auto {
+  background: var(--grid-fg, #ffffff);
+  border-radius: 0;
+}
+
+.cp-arrow {
+  opacity: 0.6;
+  margin-left: auto;
+  padding-left: 4px;
+  font-size: 10px;
+}
+
+.color-picker-menu {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 0;
+  z-index: 1000;
+  background: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  border: 1px solid var(--vscode-dropdown-border);
+  border-radius: 2px;
+  min-width: 130px;
+  padding: 2px 0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.color-picker-menu.open {
+  display: block;
+}
+
+.cp-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.cp-option:hover {
+  background: var(--vscode-list-hoverBackground, rgba(128,128,128,0.2));
+}
+
+.cp-option.cp-selected {
+  background: var(--vscode-list-activeSelectionBackground, rgba(0,120,212,0.25));
+}
+
+/* ---- Palette Panel ---- */
+#palettePanel {
+  flex-shrink: 0;
+  display: flex;
+  padding: 5px 12px;
+  border-top: 1px solid var(--vscode-panel-border, #444);
+  background: var(--vscode-panel-background, var(--vscode-editor-background));
+  color: var(--vscode-panel-foreground, var(--vscode-editor-foreground));
+  font-size: 12px;
+  gap: 0;
+}
+
+.palette-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 8px;
+  min-width: 0;
+  border-right: 1px solid var(--vscode-panel-border, #333);
+}
+.palette-col:first-child { padding-left: 0; }
+.palette-col:last-child  { border-right: none; padding-right: 0; }
+
+.palette-col-header {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  margin-bottom: 1px;
+  white-space: nowrap;
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 5px;
+  cursor: grab;
+  border: 1px solid var(--vscode-panel-border, #444);
+  border-radius: 2px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  user-select: none;
+}
+.palette-item:hover {
+  border-color: var(--vscode-focusBorder, #007fd4);
+  background: var(--vscode-list-hoverBackground, rgba(128,128,128,0.15));
+}
+.palette-item:active { cursor: grabbing; }
+
+/* size badge ("1" / "8" / "16" / "H" / "V") */
+.palette-item-size {
+  font-size: 9px;
+  color: var(--vscode-descriptionForeground, #888);
+  flex-shrink: 0;
+  min-width: 14px;
+  text-align: right;
+}
+
+/* text content preview */
+.palette-item-preview {
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+}
+
+/* input-type items show underline like real fields */
+.palette-item[data-ftype="inputtext"] .palette-item-preview,
+.palette-item[data-ftype="inputnum"]  .palette-item-preview {
+  text-decoration: underline;
+}
+
+/* arrays are not yet implemented */
+.palette-item[data-ftype="array"] {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* Ghost element that follows the cursor while dragging a palette item */
+#paletteDragGhost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  background: var(--vscode-button-background, #007fd4);
+  color: var(--vscode-button-foreground, #fff);
+  border: 1px dashed rgba(255,255,255,0.6);
+  border-radius: 2px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  padding: 2px 6px;
+  white-space: pre;
+  transform: translate(10px, 10px);
+  display: none;
+  opacity: 0.9;
 }
 </style>
 </head>
-
 <body>
+
+<!-- ===================== NAVBAR ===================== -->
 <div class="navbar">
-  <div class="title">{{TITLE}}</div>
-  <button id="renderBtn" class="active">Render</button>
-  <button id="sourceBtn">Source</button>
-  <button id="themeBtn">☀︎ / ☾</button>
+  <span class="title">{{TITLE}}</span>
+  <button class="vsc-btn active" id="renderBtn">Render</button>
+  <button class="vsc-btn" id="sourceBtn">Source</button>
+  <!-- render-only controls -->
+  <span id="renderControls" style="display:flex;align-items:center;gap:6px;">
+    <button class="vsc-btn" id="themeBtn">☀︎ / ☾</button>
+    <button class="vsc-btn" id="deleteBtn" title="Delete selected fields (Del)">🗑 Delete</button>
+    <button class="vsc-btn" id="saveBtn" title="Save fields as BMS file">💾 Save</button>
+    <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;" title="Write generated BMS to source file every 10 seconds">
+      <input type="checkbox" id="autoSyncChk"> Auto-sync
+    </label>
+    <span id="fillGroup" style="display:flex;align-items:center;gap:4px;">
+      <span class="panel-label">Fill:</span>
+      <select class="vsc-select" id="fillSelect">
+        <option value="empty">Empty</option>
+        <option value="X">X</option>
+        <option value="*">*</option>
+        <option value="#">#</option>
+        <option value="ID">ID</option>
+      </select>
+    </span>
+  </span>
 </div>
 
-<div class="canvas">
-  <div id="renderView"></div>
-  <pre id="sourceView" style="display:none;"></pre>
+<!-- ===================== SCROLL AREA ============ -->
+<div class="canvas-area" id="canvasArea">
+  <!-- render view -->
+  <div id="renderView">
+    <div class="grid-wrapper" id="gridWrapper">
+      <div class="bms-grid" id="bmsGrid"></div>
+      <canvas id="selectionOverlay"></canvas>
+    </div>
+  </div>
+
+  <!-- source view -->
+  <pre id="sourceView"></pre>
+</div>
+
+<!-- ===================== FIELD PANEL ============= -->
+<div id="fieldPanel">
+  <div class="panel-group">
+    <span class="panel-label">ID</span>
+    <input class="vsc-input" id="panelId" type="text" maxlength="20" style="width:70px;" />
+  </div>
+  <div class="panel-group">
+    <span class="panel-label">Row</span>
+    <input class="vsc-input" id="panelRow" type="number" style="width:50px;" />
+    <span class="panel-label">Col</span>
+    <input class="vsc-input" id="panelCol" type="number" style="width:50px;" />
+    <span class="panel-label">Len</span>
+    <input class="vsc-input" id="panelLen" type="number" style="width:50px;" />
+  </div>
+  <div class="panel-group">
+    <span class="panel-label">Color</span>
+    <div class="color-picker" id="colorPicker">
+      <button type="button" class="vsc-btn color-picker-trigger" id="colorPickerTrigger">
+        <span class="cp-swatch cp-swatch-auto" id="colorPickerSwatch"></span>
+        <span id="colorPickerLabel">Default</span>
+        <span class="cp-arrow">&#9662;</span>
+      </button>
+      <div class="color-picker-menu" id="colorPickerMenu">
+        <div class="cp-option cp-selected" data-value="default" data-color=""><span class="cp-swatch cp-swatch-auto"></span><span>Default</span></div>
+        <div class="cp-option" data-value="pink" data-color="#ff69b4"><span class="cp-swatch" style="background:#ff69b4;"></span><span>Pink</span></div>
+        <div class="cp-option" data-value="red" data-color="#ff4444"><span class="cp-swatch" style="background:#ff4444;"></span><span>Red</span></div>
+        <div class="cp-option" data-value="green" data-color="#44ff44"><span class="cp-swatch" style="background:#44ff44;"></span><span>Green</span></div>
+        <div class="cp-option" data-value="turquoise" data-color="#44ffee"><span class="cp-swatch" style="background:#44ffee;"></span><span>Turquoise</span></div>
+        <div class="cp-option" data-value="blue" data-color="#4488ff"><span class="cp-swatch" style="background:#4488ff;"></span><span>Blue</span></div>
+        <div class="cp-option" data-value="neutral" data-color=""><span class="cp-swatch cp-swatch-auto"></span><span>Neutral</span></div>
+        <div class="cp-option" data-value="yellow" data-color="#ffff44"><span class="cp-swatch" style="background:#ffff44;"></span><span>Yellow</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="panel-group">
+    <span class="panel-label">Highlight</span>
+    <select class="vsc-select" id="panelHighlight">
+      <option value="off">Off</option>
+      <option value="blink">Blink</option>
+      <option value="reverse">Reverse</option>
+      <option value="underline">Underline</option>
+    </select>
+  </div>
+</div>
+
+<!-- drag ghost (fixed-position, not part of flex column) -->
+<div id="paletteDragGhost"></div>
+
+<!-- ===================== PALETTE PANEL ============ -->
+<div id="palettePanel">
+
+  <!-- Labels (PROT) -->
+  <div class="palette-col">
+    <div class="palette-col-header">Labels</div>
+    <div class="palette-item" data-ftype="label" data-length="1">
+      <span class="palette-item-size">1</span><span class="palette-item-preview">A</span>
+    </div>
+    <div class="palette-item" data-ftype="label" data-length="8">
+      <span class="palette-item-size">8</span><span class="palette-item-preview">Label</span>
+    </div>
+    <div class="palette-item" data-ftype="label" data-length="16">
+      <span class="palette-item-size">16</span><span class="palette-item-preview">Long Label</span>
+    </div>
+  </div>
+
+  <!-- Input Text (UNPROT) -->
+  <div class="palette-col">
+    <div class="palette-col-header">Input Text</div>
+    <div class="palette-item" data-ftype="inputtext" data-length="1">
+      <span class="palette-item-size">1</span><span class="palette-item-preview">_</span>
+    </div>
+    <div class="palette-item" data-ftype="inputtext" data-length="8">
+      <span class="palette-item-size">8</span><span class="palette-item-preview">________</span>
+    </div>
+    <div class="palette-item" data-ftype="inputtext" data-length="16">
+      <span class="palette-item-size">16</span><span class="palette-item-preview">________________</span>
+    </div>
+  </div>
+
+  <!-- Input Numbers (UNPROT NUM) -->
+  <div class="palette-col">
+    <div class="palette-col-header">Input Num</div>
+    <div class="palette-item" data-ftype="inputnum" data-length="1">
+      <span class="palette-item-size">1</span><span class="palette-item-preview">0</span>
+    </div>
+    <div class="palette-item" data-ftype="inputnum" data-length="8">
+      <span class="palette-item-size">8</span><span class="palette-item-preview">00000000</span>
+    </div>
+    <div class="palette-item" data-ftype="inputnum" data-length="16">
+      <span class="palette-item-size">16</span><span class="palette-item-preview">0000000000000000</span>
+    </div>
+  </div>
+
+  <!-- Arrays (placeholder — not yet implemented) -->
+  <div class="palette-col">
+    <div class="palette-col-header">Arrays</div>
+    <div class="palette-item" data-ftype="array" data-direction="horizontal" data-length="8">
+      <span class="palette-item-size">H</span><span class="palette-item-preview">→ Array ×8</span>
+    </div>
+    <div class="palette-item" data-ftype="array" data-direction="vertical" data-length="8">
+      <span class="palette-item-size">V</span><span class="palette-item-preview">↓ Array ×8</span>
+    </div>
+  </div>
+
 </div>
 
 <script>
-const bmsSource = "{{SOURCE}}";
-const renderView = document.getElementById('renderView');
-const sourceView = document.getElementById('sourceView');
-sourceView.textContent = bmsSource;
+/* ===========================================================
+   CONSTANTS
+   =========================================================== */
+// Cell aspect ratio: height = CELL_RATIO * width
+const CELL_RATIO     = 2.0;
+const BLINK_MS       = 1000; // ms per blink cycle
+const MAX_UNDO_STEPS = 50;   // Configurable: maximum number of undo/redo steps
 
-/* ---------------------------
-   PARSE MAP (DFHMDI)
---------------------------- */
-function parseMap(source) {
-  const size = source.match(/SIZE=\((\d+),(\d+)\)/);
-  const line = source.match(/LINE=(\d+)/);
-  const col  = source.match(/COLUMN=(\d+)/);
+// Grid themes
+const GRID_THEMES = {
+  dark:  { bg: '#000000', fg: '#ffffff' },
+  light: { bg: '#ffffff', fg: '#000000' },
+};
 
-  return {
-    rows: size ? +size[1] : 24,
-    cols: size ? +size[2] : 80,
-    line: line ? +line[1] : 1,
-    column: col ? +col[1] : 1
-  };
+// Mutable palette — updated by theme toggle
+let gridTheme = 'dark';
+let GRID_BG   = GRID_THEMES.dark.bg;
+let GRID_FG   = GRID_THEMES.dark.fg;
+
+// null means "inherit GRID_FG" so default + neutral follow the theme
+const FIELD_COLORS = {
+  default:   null,
+  pink:      '#ff69b4',
+  red:       '#ff4444',
+  green:     '#44ff44',
+  turquoise: '#44ffee',
+  blue:      '#4488ff',
+  neutral:   null,
+  yellow:    '#ffff44',
+};
+
+const FILL_TYPES = { empty: 'empty', X: 'X', '*': '*', '#': '#', ID: 'ID' };
+
+function applyGridTheme() {
+  const t = GRID_THEMES[gridTheme];
+  GRID_BG = t.bg;
+  GRID_FG = t.fg;
+  const grid    = document.getElementById('bmsGrid');
+  const wrapper = document.getElementById('gridWrapper');
+  if (grid) {
+    grid.style.background = GRID_BG;
+    grid.style.color      = GRID_FG;
+  }
+  if (wrapper) {
+    // Border uses grid foreground at reduced opacity
+    wrapper.style.setProperty('--grid-border', GRID_FG + '66');
+  }
+  // Expose as CSS variable so cp-swatch-auto can reference it
+  document.documentElement.style.setProperty('--grid-fg', GRID_FG);
 }
 
-/* ---------------------------
-   PARSE FIELDS (DFHMDF)
---------------------------- */
-function parseFields(source) {
-  const fields = [];
-  const regex = /^(\w{1,7})\s+DFHMDF([\s\S]*?)(?=^\w{1,7}\s+DFHMDF|\Z)/gm;
+/* ===========================================================
+   STATE
+   =========================================================== */
+const bmsSource = "{{SOURCE}}";
 
-  let match;
-  while ((match = regex.exec(source))) {
-    const body = match[2];
+// acquireVsCodeApi can only be called once per page lifetime
+let _vscodeApi = null;
+function getVsCodeApi() {
+  if (!_vscodeApi && typeof acquireVsCodeApi === 'function') {
+    _vscodeApi = acquireVsCodeApi();
+  }
+  return _vscodeApi;
+}
 
-    const pos = body.match(/POS=\((\d+),(\d+)\)/);
-    const len = body.match(/LENGTH=(\d+)/);
-    const init = body.match(/INITIAL='([^']*)'/);
+let mapDef    = null;   // { rows, cols }
+let fields    = [];     // parsed + augmented field objects
+let cells     = [];     // flat array of cell DOM elements (row-major)
 
-    if (pos && len) {
-      fields.push({
-        row: +pos[1] - 1,
-        col: +pos[2] - 1,
+let selectedIds = new Set();  // field indices that are selected
+
+let fillMode  = 'empty';
+
+// drag/resize state
+let dragState = null;
+// { type: 'move'|'resize-left'|'resize-right', fieldIdx, startX, startY, origRow, origCol, origLen }
+
+/* ===========================================================
+   MODULE: PARSER
+   =========================================================== */
+const Parser = (() => {
+  function parseMap(source) {
+    const size = source.match(/SIZE=\((\d+),(\d+)\)/);
+    const line = source.match(/LINE=(\d+)/);
+    const col  = source.match(/COLUMN=(\d+)/);
+    return {
+      rows:   size ? +size[1] : 24,
+      cols:   size ? +size[2] : 80,
+      line:   line ? +line[1] : 1,
+      column: col  ? +col[1]  : 1,
+    };
+  }
+
+  function parseFields(source) {
+    // Two-pass: find every DFHMDF start position, then slice source into blocks.
+    // This correctly handles multi-line definitions where LENGTH= / POS= appear
+    // on continuation lines (not just the first line of the macro statement).
+    const labelRe = /^(\w{1,7})\s+DFHMDF\b/gm;
+    const starts  = [];
+    let m;
+    while ((m = labelRe.exec(source)) !== null) {
+      starts.push({ id: m[1], index: m.index });
+    }
+
+    const result = [];
+    for (let i = 0; i < starts.length; i++) {
+      const blockStart = starts[i].index;
+      const blockEnd   = i + 1 < starts.length ? starts[i + 1].index : source.length;
+      const block      = source.slice(blockStart, blockEnd);
+      const id         = starts[i].id;
+
+      const pos    = block.match(/POS=\((\d+),(\d+)\)/);
+      const len    = block.match(/LENGTH=(\d+)/i);
+      const init   = block.match(/INITIAL='([^']*)'/i);
+      const prot   = /\bPROT\b/.test(block);
+      const unprot = /\bUNPROT\b/.test(block);
+
+      if (!pos || !len) continue;
+
+      result.push({
+        id,
+        row:    +pos[1] - 1,
+        col:    +pos[2] - 1,
         length: +len[1],
-        text: init ? init[1] : ''
+        initialText: init ? init[1] : '',
+        prot,
+        unprot,
+        color:     'default',
+        highlight: 'off',
       });
     }
+    return result;
   }
 
-  return fields;
-}
+  return { parseMap, parseFields };
+})();
 
-/* ---------------------------
-   CREATE GRID
---------------------------- */
-function createGrid(def) {
-  const grid = document.createElement('div');
-  grid.className = 'grid';
-  grid.style.gridTemplateRows = `repeat(${def.rows}, 1.2em)`;
-  grid.style.gridTemplateColumns = `repeat(${def.cols}, 0.6em)`;
+/* ===========================================================
+   MODULE: FILL
+   Computes display text for a field given the current fill mode.
+   =========================================================== */
+const Fill = (() => {
+  function getText(field, mode) {
+    // INITIAL text always takes precedence regardless of mode
+    if (field.initialText) return formatText(field.initialText, field.length);
 
-  const cells = [];
-  for (let i = 0; i < def.rows * def.cols; i++) {
-    const cell = document.createElement('div');
-    cell.className = 'cell';
-    cell.textContent = ' ';
-    grid.appendChild(cell);
-    cells.push(cell);
+    // Only apply fill to PROT/UNPROT fields when they have no INITIAL
+    if (!field.prot && !field.unprot) return ' '.repeat(field.length);
+
+    switch (mode) {
+      case 'empty': return ' '.repeat(field.length);
+      case 'X':
+      case '*':
+      case '#':   return mode.repeat(field.length);
+      case 'ID':  return formatText(field.id, field.length, '.');
+      default:    return ' '.repeat(field.length);
+    }
   }
 
-  return { grid, cells };
+  function formatText(str, len, padChar = ' ') {
+    if (padChar !== ' ') {
+      str = `<${str}:${len}>`;
+    }
+    if (str.length > len) return str.slice(0, len);
+    return str + padChar.repeat(len - str.length);
+  }
+
+  return { getText };
+})();
+
+/* ===========================================================
+   MODULE: GRID BUILDER
+   =========================================================== */
+const GridBuilder = (() => {
+  function build(def) {
+    const grid = document.getElementById('bmsGrid');
+    grid.innerHTML = '';
+    grid.style.background = GRID_BG;
+    grid.style.color      = GRID_FG;
+
+    const newCells = [];
+    const total = def.rows * def.cols;
+    const fragment = document.createDocumentFragment();
+    for (let i = 0; i < total; i++) {
+      const el = document.createElement('div');
+      el.className = 'grid-cell';
+      el.textContent = ' ';
+      fragment.appendChild(el);
+      newCells.push(el);
+    }
+    grid.appendChild(fragment);
+    return newCells;
+  }
+
+  return { build };
+})();
+
+/* ===========================================================
+   GRID SIZING
+   Computes px cell size from wrapper width and applies it.
+   Called after initial render and on every container resize.
+   =========================================================== */
+function fitGrid(def) {
+  if (!def) return;
+  const wrapper = document.getElementById('gridWrapper');
+  const grid    = document.getElementById('bmsGrid');
+  if (!wrapper || !grid) return;
+
+  // Available width minus the 2×2px border
+  const avail  = wrapper.clientWidth - 4;
+  const cellW  = avail / def.cols;
+  const cellH  = cellW * CELL_RATIO;
+  // Font-size so one character (0.6em wide) fits inside cellW
+  const fontSize = cellW / 0.6;
+
+  grid.style.gridTemplateColumns = `repeat(${def.cols}, ${cellW}px)`;
+  grid.style.gridTemplateRows    = `repeat(${def.rows}, ${cellH}px)`;
+  grid.style.fontSize            = `${fontSize}px`;
+
+  SelectionOverlay.resize(def);
+  SelectionOverlay.draw(def, selectedIds, fields);
 }
 
-/* ---------------------------
-   APPLY FIELDS
---------------------------- */
-function applyFields(cells, def, fields) {
-  fields.forEach(f => {
+/* ===========================================================
+   MODULE: FIELD RENDERER
+   Applies field data to cell elements and handles color/highlight.
+   =========================================================== */
+const FieldRenderer = (() => {
+  // Active blink intervals: fieldIdx -> intervalId
+  const blinkTimers = {};
+
+  function clearAllBlink() {
+    Object.values(blinkTimers).forEach(clearInterval);
+    Object.keys(blinkTimers).forEach(k => delete blinkTimers[k]);
+  }
+
+  function applyAll(mapDef, fields, cells, fillMode) {
+    clearAllBlink();
+
+    // Reset all cells first
+    cells.forEach(c => {
+      c.textContent = ' ';
+      c.className = 'grid-cell';
+      c.style.cssText = '';
+    });
+
+    fields.forEach((f, idx) => {
+      const text = Fill.getText(f, fillMode);
+      applyField(mapDef, cells, f, idx, text);
+    });
+  }
+
+  function applyField(mapDef, cells, f, idx, text) {
+    const fgColor = FIELD_COLORS[f.color] ?? GRID_FG;
+    const isReverse   = f.highlight === 'reverse';
+    const isBlink     = f.highlight === 'blink';
+    const isUnderline = f.highlight === 'underline';
+
+    // For reverse/blink: swap fg and fgColor as background.
+    // For normal: fg is the field color; leave backgroundColor empty so the
+    // CSS class `.is-field` subtle tint shows through.
+    const fg = isReverse ? GRID_BG : fgColor;
+    const bg = (isReverse || isBlink) ? fgColor : '';
+
     for (let i = 0; i < f.length; i++) {
-      const idx = (f.row * def.cols) + f.col + i;
-      if (!cells[idx]) return;
+      const cellIdx = f.row * mapDef.cols + f.col + i;
+      const cell = cells[cellIdx];
+      if (!cell) continue;
 
-      cells[idx].textContent = f.text[i] || ' ';
-      cells[idx].classList.add('field');
+      cell.textContent = text[i] ?? ' ';
+      cell.className = 'grid-cell is-field';
+      cell.dataset.fieldIdx = idx;
+
+      cell.style.color           = fg;
+      cell.style.backgroundColor = bg;
+      cell.style.textDecoration  = isUnderline ? 'underline' : '';
+
+      if (isBlink) {
+        startBlink(idx, f, mapDef, cells, fgColor);
+      }
+    }
+  }
+
+  function startBlink(idx, f, mapDef, cells, fgColor) {
+    if (blinkTimers[idx]) return; // already running
+    let phase = false;
+
+    blinkTimers[idx] = setInterval(() => {
+      phase = !phase;
+      const fg = phase ? GRID_BG : fgColor;
+      const bg = phase ? fgColor : '';   // '' lets CSS tint show in off-phase
+      for (let i = 0; i < f.length; i++) {
+        const cellIdx = f.row * mapDef.cols + f.col + i;
+        const cell = cells[cellIdx];
+        if (!cell) continue;
+        cell.style.color           = fg;
+        cell.style.backgroundColor = bg;
+      }
+    }, BLINK_MS);
+  }
+
+  function refreshField(mapDef, cells, f, idx, fillMode) {
+    // Clear blink timer for this field if any
+    if (blinkTimers[idx]) {
+      clearInterval(blinkTimers[idx]);
+      delete blinkTimers[idx];
+    }
+    const text = Fill.getText(f, fillMode);
+    applyField(mapDef, cells, f, idx, text);
+  }
+
+  return { applyAll, refreshField, clearAllBlink };
+})();
+
+/* ===========================================================
+   MODULE: SELECTION OVERLAY
+   Drawn with XOR composite so the indicator is always visible
+   regardless of field color, highlight, or grid theme.
+   =========================================================== */
+const SelectionOverlay = (() => {
+  let canvas, ctx, cellWpx, cellHpx;
+  // Lasso drag state
+  let lassoRect   = null; // { x1,y1,x2,y2 } in canvas px
+  // Palette drop preview
+  let dropPreview = null; // { row, col, length }
+  // Collision state — turns selection indicator red
+  let isColliding = false;
+
+  function init() {
+    canvas = document.getElementById('selectionOverlay');
+    ctx    = canvas.getContext('2d');
+  }
+
+  function measure() {
+    const firstCell = document.querySelector('.grid-cell');
+    if (!firstCell) return;
+    const r = firstCell.getBoundingClientRect();
+    cellWpx = r.width;
+    cellHpx = r.height;
+  }
+
+  function resize(def) {
+    const grid = document.getElementById('bmsGrid');
+    canvas.width  = grid.offsetWidth;
+    canvas.height = grid.offsetHeight;
+    canvas.style.width  = grid.offsetWidth  + 'px';
+    canvas.style.height = grid.offsetHeight + 'px';
+    measure();
+  }
+
+  function draw(def, selectedIds, fields) {
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Selection indicator: VSCode button background colour (reads current theme via CSS var)
+    const vscBlue = getComputedStyle(document.documentElement)
+      .getPropertyValue('--vscode-button-background').trim() || '#0078d4';
+
+    selectedIds.forEach(idx => {
+      const f = fields[idx];
+      if (!f) return;
+      const x = f.col    * cellWpx;
+      const y = f.row    * cellHpx;
+      const w = f.length * cellWpx;
+      const h = cellHpx;
+
+      const selColor = isColliding ? '#ff4040' : vscBlue;
+      ctx.strokeStyle = selColor;
+      ctx.lineWidth   = 2;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+
+      // Resize handles — solid filled squares, only for single selection
+      if (selectedIds.size === 1) {
+        ctx.fillStyle = selColor;
+        ctx.setLineDash([]);
+        ctx.fillRect(x,         y + Math.floor((h - 7) / 2), 6, 7);
+        ctx.fillRect(x + w - 6, y + Math.floor((h - 7) / 2), 6, 7);
+      }
+    });
+
+    // Lasso rect (drawn normally, not XOR)
+    if (lassoRect) {
+      const { x1, y1, x2, y2 } = lassoRect;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+      ctx.lineWidth   = 1;
+      ctx.setLineDash([4, 3]);
+      ctx.fillStyle   = 'rgba(100,180,255,0.15)';
+      const rx = Math.min(x1, x2), ry = Math.min(y1, y2);
+      const rw = Math.abs(x2 - x1),  rh = Math.abs(y2 - y1);
+      ctx.fillRect(rx, ry, rw, rh);
+      ctx.strokeRect(rx, ry, rw, rh);
+      ctx.restore();
+    }
+
+    // Drop-target preview when dragging from the palette
+    if (dropPreview) {
+      const { row, col, length } = dropPreview;
+      ctx.save();
+      ctx.fillStyle   = isColliding ? 'rgba(220,50,50,0.25)'  : 'rgba(0,127,212,0.25)';
+      ctx.strokeStyle = isColliding ? '#dd3333'               : '#007fd4';
+      ctx.lineWidth   = 1;
+      ctx.setLineDash([4, 3]);
+      ctx.fillRect(col   * cellWpx, row * cellHpx, length * cellWpx, cellHpx);
+      ctx.strokeRect(col * cellWpx, row * cellHpx, length * cellWpx, cellHpx);
+      ctx.restore();
+    }
+  }
+
+  function setLasso(rect) {
+    lassoRect = rect;
+  }
+
+  function setDropPreview(preview) {
+    dropPreview = preview;
+  }
+
+  function setColliding(v) { isColliding = v; }
+
+  return { init, resize, draw, setLasso, setDropPreview, setColliding, getCellSize: () => ({ cellWpx, cellHpx }) };
+})();
+
+/* ===========================================================
+   MODULE: INLINE EDITOR
+   Allows editing ASKIP field text directly on the grid.
+   =========================================================== */
+const InlineEditor = (() => {
+  let activeIdx = null;
+
+  function open(idx, fields, mapDef, cells) {
+    const f = fields[idx];
+    // Only ASKIP (neither PROT nor UNPROT, length > 1) or any field with text
+    if (f.length <= 1) return;
+
+    activeIdx = idx;
+    const grid = document.getElementById('bmsGrid');
+    const r    = grid.getBoundingClientRect();
+    const cellW = r.width  / mapDef.cols;
+    const cellH = r.height / mapDef.rows;
+
+    const input = document.createElement('input');
+    input.type  = 'text';
+    input.value = f.initialText || Fill.getText(f, fillMode).trimEnd();
+    input.style.cssText = [
+      `position:absolute`,
+      `left:${f.col * cellW}px`,
+      `top:${f.row * cellH}px`,
+      `width:${f.length * cellW}px`,
+      `height:${cellH}px`,
+      `font-family:'Courier New',monospace`,
+      `font-size:${grid.style.fontSize}`,
+      `background:${GRID_BG}`,
+      `color:${FIELD_COLORS[f.color] ?? GRID_FG}`,
+      `border:none`,
+      `outline:2px solid #fff`,
+      `padding:0`,
+      `box-sizing:border-box`,
+      `z-index:20`,
+    ].join(';');
+
+    const wrapper = document.getElementById('gridWrapper');
+    wrapper.appendChild(input);
+    input.focus();
+    input.select();
+
+    function commit() {
+      f.initialText = input.value;
+      input.remove();
+      activeIdx = null;
+      FieldRenderer.refreshField(mapDef, cells, f, idx, fillMode);
+      SelectionOverlay.draw(mapDef, selectedIds, fields);
+    }
+
+    input.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter' || ev.key === 'Escape') { ev.preventDefault(); commit(); }
+    });
+    input.addEventListener('blur', commit);
+  }
+
+  function isActive() { return activeIdx !== null; }
+
+  return { open, isActive };
+})();
+
+/* ===========================================================
+   MODULE: CURSOR
+   Updates the grid cursor based on hover / drag state.
+   =========================================================== */
+const Cursor = (() => {
+  function set(type) {
+    const grid = document.getElementById('bmsGrid');
+    if (!grid) return;
+    const map = {
+      default:       'default',
+      field:         'pointer',
+      move:          'grab',
+      grabbing:      'grabbing',
+      'resize-left': 'ew-resize',
+      'resize-right':'ew-resize',
+      lasso:         'crosshair',
+      ctrlhover:     'alias',
+    };
+    grid.style.cursor = map[type] ?? 'default';
+  }
+  return { set };
+})();
+
+/* ===========================================================
+   COLLISION DETECTION
+   Returns true if candidate ({row, col, length}) overlaps any
+   field not in excludeSet (a Set of field indices).
+   =========================================================== */
+function fieldCollides(candidate, allFields, excludeSet) {
+  for (let i = 0; i < allFields.length; i++) {
+    if (excludeSet && excludeSet.has(i)) continue;
+    const f = allFields[i];
+    if (f.row !== candidate.row) continue;
+    const aEnd = candidate.col + candidate.length - 1;
+    const bEnd = f.col + f.length - 1;
+    if (candidate.col <= bEnd && aEnd >= f.col) return true;
+  }
+  return false;
+}
+
+function anyCollision(candidates, allFields, excludeSet) {
+  return candidates.some(c => fieldCollides(c, allFields, excludeSet));
+}
+
+/* ===========================================================
+   MODULE: INTERACTION
+   Handles click, multi-select, drag, resize, lasso, inline-edit,
+   ctrl+click-to-reveal, and cursor updates.
+   =========================================================== */
+const Interaction = (() => {
+  let isDragging = false;
+  let dragInfo   = null;
+
+  // Lasso state (drag on empty space to rubber-band select)
+  let isLasso   = false;
+  let lassoInfo = null; // { startX, startY, startGridX, startGridY }
+
+  // How many px the mouse must move before we commit to a drag vs a click
+  const DRAG_THRESHOLD = 4;
+
+  function init(mapDef, fields, cells) {
+    const grid = document.getElementById('bmsGrid');
+    grid.addEventListener('mousedown',  e => onGridMouseDown(e, mapDef, fields, cells));
+    grid.addEventListener('mousemove',  e => onGridHover(e, mapDef, fields));
+    grid.addEventListener('mouseleave', () => Cursor.set('default'));
+    grid.addEventListener('dblclick',   e => onGridDblClick(e, mapDef, fields, cells));
+    window.addEventListener('mousemove', e => onMouseMove(e, mapDef, fields, cells));
+    window.addEventListener('mouseup',   e => onMouseUp(e, mapDef, fields, cells));
+  }
+
+  /* ---- helpers ---- */
+  function getFieldAtCell(fields, row, col) {
+    for (let i = fields.length - 1; i >= 0; i--) {
+      const f = fields[i];
+      if (f.row === row && col >= f.col && col < f.col + f.length) return i;
+    }
+    return -1;
+  }
+
+  function getCellCoords(e, mapDef) {
+    const grid  = document.getElementById('bmsGrid');
+    const r     = grid.getBoundingClientRect();
+    const x     = e.clientX - r.left;
+    const y     = e.clientY - r.top;
+    const cellW = r.width  / mapDef.cols;
+    const cellH = r.height / mapDef.rows;
+    return {
+      col:   Math.floor(x / cellW),
+      row:   Math.floor(y / cellH),
+      px: x, py: y, cellW, cellH,
+    };
+  }
+
+  function getResizeHandle(e, fieldIdx, fields, mapDef) {
+    if (selectedIds.size !== 1) return null;
+    const f = fields[fieldIdx];
+    const grid  = document.getElementById('bmsGrid');
+    const r     = grid.getBoundingClientRect();
+    const cellW = r.width / mapDef.cols;
+    const fx    = f.col * cellW + r.left;
+    const fw    = f.length * cellW;
+    const mx    = e.clientX;
+    if (Math.abs(mx - fx)        < 8) return 'resize-left';
+    if (Math.abs(mx - (fx + fw)) < 8) return 'resize-right';
+    return null;
+  }
+
+  /* ---- hover cursor update ---- */
+  function onGridHover(e, mapDef, fields) {
+    if (isDragging || isLasso) return;
+    const { col, row } = getCellCoords(e, mapDef);
+    const idx = getFieldAtCell(fields, row, col);
+    if (idx < 0) { Cursor.set('default'); return; }
+    if (e.ctrlKey || e.metaKey) { Cursor.set('ctrlhover'); return; }
+    const handle = getResizeHandle(e, idx, fields, mapDef);
+    if (handle) { Cursor.set(handle); return; }
+    Cursor.set('field');
+  }
+
+  /* ---- double-click: inline edit ---- */
+  function onGridDblClick(e, mapDef, fields, cells) {
+    const { col, row } = getCellCoords(e, mapDef);
+    const idx = getFieldAtCell(fields, row, col);
+    if (idx < 0) return;
+    const f = fields[idx];
+    // Only open inline editor for ASKIP-like fields (not PROT/UNPROT input fields)
+    if (!f.prot && !f.unprot && f.length > 1) {
+      InlineEditor.open(idx, fields, mapDef, cells);
+    }
+  }
+
+  /* ---- mousedown ---- */
+  function onGridMouseDown(e, mapDef, fields, cells) {
+    if (e.button !== 0) return;
+    if (InlineEditor.isActive()) return;
+
+    const { col, row, px, py } = getCellCoords(e, mapDef);
+    const idx = getFieldAtCell(fields, row, col);
+
+    // Ctrl/Cmd + click: reveal in editor
+    if ((e.ctrlKey || e.metaKey) && idx >= 0) {
+      e.preventDefault();
+      const f = fields[idx];
+      const vscode = getVsCodeApi();
+      if (vscode) vscode.postMessage({ command: 'revealField', fieldId: f.id });
+      return;
+    }
+
+    // Clicked empty space — start lasso or clear selection
+    if (idx < 0) {
+      if (!e.shiftKey) {
+        selectedIds.clear();
+        updatePanelAndOverlay(mapDef, fields, cells);
+      }
+      // Begin lasso
+      isLasso   = true;
+      lassoInfo = { startX: e.clientX, startY: e.clientY, startPx: px, startPy: py };
+      Cursor.set('lasso');
+      e.preventDefault();
+      return;
+    }
+
+    const handle = getResizeHandle(e, idx, fields, mapDef);
+
+    if (handle) {
+      isDragging = true;
+      dragInfo = {
+        type: handle, fieldIdx: idx,
+        startX: e.clientX, startY: e.clientY,
+        origRow: fields[idx].row, origCol: fields[idx].col, origLen: fields[idx].length,
+        origState: JSON.parse(JSON.stringify(fields)),
+      };
+      Cursor.set(handle);
+      e.preventDefault();
+      return;
+    }
+
+    // Toggle selection on Shift/Ctrl, else single-select
+    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+      if (selectedIds.has(idx)) selectedIds.delete(idx);
+      else selectedIds.add(idx);
+    } else {
+      if (!selectedIds.has(idx)) {
+        selectedIds.clear();
+        selectedIds.add(idx);
+      }
+    }
+
+    updatePanelAndOverlay(mapDef, fields, cells);
+
+    // Begin drag-move
+    isDragging = true;
+    dragInfo = {
+      type: 'move', fieldIdx: idx,
+      startX: e.clientX, startY: e.clientY,
+      origRow: fields[idx].row, origCol: fields[idx].col, origLen: fields[idx].length,
+      movedEnough: false,
+      snapshot: [...selectedIds].map(i => ({ idx: i, row: fields[i].row, col: fields[i].col })),
+      origState: JSON.parse(JSON.stringify(fields)),
+    };
+    Cursor.set('move');
+    e.preventDefault();
+  }
+
+  /* ---- mousemove ---- */
+  function onMouseMove(e, mapDef, fields, cells) {
+    // Lasso mode
+    if (isLasso && lassoInfo) {
+      const grid  = document.getElementById('bmsGrid');
+      const r     = grid.getBoundingClientRect();
+      const x1    = lassoInfo.startPx;
+      const y1    = lassoInfo.startPy;
+      const x2    = e.clientX - r.left;
+      const y2    = e.clientY - r.top;
+      SelectionOverlay.setLasso({ x1, y1, x2, y2 });
+      SelectionOverlay.resize(mapDef);
+      SelectionOverlay.draw(mapDef, selectedIds, fields);
+      return;
+    }
+
+    if (!isDragging || !dragInfo) return;
+
+    const distX = Math.abs(e.clientX - dragInfo.startX);
+    const distY = Math.abs(e.clientY - dragInfo.startY);
+    if (!dragInfo.movedEnough && distX < DRAG_THRESHOLD && distY < DRAG_THRESHOLD) return;
+    dragInfo.movedEnough = true;
+
+    Cursor.set(dragInfo.type === 'move' ? 'grabbing' : dragInfo.type);
+
+    const grid  = document.getElementById('bmsGrid');
+    const r     = grid.getBoundingClientRect();
+    const cellW = r.width  / mapDef.cols;
+    const cellH = r.height / mapDef.rows;
+    const dx    = Math.round((e.clientX - dragInfo.startX) / cellW);
+    const dy    = Math.round((e.clientY - dragInfo.startY) / cellH);
+
+    if (dragInfo.type === 'move') {
+      dragInfo.snapshot.forEach(snap => {
+        const f = fields[snap.idx];
+        f.row = Math.max(0, Math.min(mapDef.rows - 1, snap.row + dy));
+        f.col = Math.max(0, Math.min(mapDef.cols - f.length, snap.col + dx));
+      });
+      dragInfo.colliding = anyCollision(
+        dragInfo.snapshot.map(snap => fields[snap.idx]), fields, selectedIds
+      );
+    } else if (dragInfo.type === 'resize-right') {
+      const f = fields[dragInfo.fieldIdx];
+      f.length = Math.min(Math.max(1, dragInfo.origLen + dx), mapDef.cols - f.col);
+      dragInfo.colliding = fieldCollides(f, fields, new Set([dragInfo.fieldIdx]));
+    } else if (dragInfo.type === 'resize-left') {
+      const f    = fields[dragInfo.fieldIdx];
+      const newCol = Math.max(0, Math.min(dragInfo.origCol + dx, dragInfo.origCol + dragInfo.origLen - 1));
+      const delta  = newCol - dragInfo.origCol;
+      f.col    = newCol;
+      f.length = Math.max(1, dragInfo.origLen - delta);
+      dragInfo.colliding = fieldCollides(f, fields, new Set([dragInfo.fieldIdx]));
+    }
+
+    SelectionOverlay.setColliding(dragInfo.colliding || false);
+    FieldRenderer.applyAll(mapDef, fields, cells, fillMode);
+    SelectionOverlay.resize(mapDef);
+    SelectionOverlay.draw(mapDef, selectedIds, fields);
+    updatePanel(fields);
+  }
+
+  /* ---- mouseup ---- */
+  function onMouseUp(e, mapDef, fields, cells) {
+    // Commit lasso selection
+    if (isLasso && lassoInfo) {
+      const grid  = document.getElementById('bmsGrid');
+      const r     = grid.getBoundingClientRect();
+      const cellW = r.width  / mapDef.cols;
+      const cellH = r.height / mapDef.rows;
+
+      const gx1 = lassoInfo.startPx;
+      const gy1 = lassoInfo.startPy;
+      const gx2 = e.clientX - r.left;
+      const gy2 = e.clientY - r.top;
+
+      const minCol = Math.max(0, Math.floor(Math.min(gx1, gx2) / cellW));
+      const maxCol = Math.min(mapDef.cols - 1, Math.floor(Math.max(gx1, gx2) / cellW));
+      const minRow = Math.max(0, Math.floor(Math.min(gy1, gy2) / cellH));
+      const maxRow = Math.min(mapDef.rows - 1, Math.floor(Math.max(gy1, gy2) / cellH));
+
+      if (!e.shiftKey && !e.ctrlKey && !e.metaKey) selectedIds.clear();
+
+      fields.forEach((f, idx) => {
+        // A field is inside the lasso if any of its cols overlap the lasso columns
+        const fColEnd = f.col + f.length - 1;
+        if (f.row >= minRow && f.row <= maxRow &&
+            fColEnd >= minCol && f.col <= maxCol) {
+          selectedIds.add(idx);
+        }
+      });
+
+      isLasso   = false;
+      lassoInfo = null;
+      SelectionOverlay.setLasso(null);
+      updatePanelAndOverlay(mapDef, fields, cells);
+      Cursor.set('default');
+      return;
+    }
+
+    if (!isDragging) return;
+    const wasColliding = dragInfo && dragInfo.colliding;
+    const info = dragInfo;
+    isDragging = false;
+    dragInfo   = null;
+    SelectionOverlay.setColliding(false);
+
+    if (wasColliding && info) {
+      // Revert to the positions that were recorded at drag start
+      if (info.type === 'move') {
+        info.snapshot.forEach(snap => {
+          fields[snap.idx].row = snap.row;
+          fields[snap.idx].col = snap.col;
+        });
+      } else {
+        fields[info.fieldIdx].col    = info.origCol;
+        fields[info.fieldIdx].length = info.origLen;
+      }
+      FieldRenderer.applyAll(mapDef, fields, cells, fillMode);
+    }
+
+    // Push undo entry if the drag committed a real change
+    if (!wasColliding && info && info.movedEnough && info.origState) {
+      History.pushRaw(info.origState);
+    }
+    Cursor.set('default');
+    updatePanelAndOverlay(mapDef, fields, cells);
+  }
+
+  return { init };
+})();
+
+/* ===========================================================
+   MODULE: PANEL
+   Controls the bottom field details panel.
+   =========================================================== */
+function updatePanel(fields) {
+  const panel    = document.getElementById('fieldPanel');
+  const idInput  = document.getElementById('panelId');
+  const rowInput = document.getElementById('panelRow');
+  const colInput = document.getElementById('panelCol');
+  const lenInput = document.getElementById('panelLen');
+  const hlSel    = document.getElementById('panelHighlight');
+
+  if (selectedIds.size === 0) {
+    panel.style.display = 'none';
+    return;
+  }
+
+  panel.style.display = 'flex';
+  const multi    = selectedIds.size > 1;
+  const firstIdx = [...selectedIds][0];
+  const first    = fields[firstIdx];
+
+  idInput.disabled  = multi;  // editable when a single field is selected
+  rowInput.disabled = multi;
+  colInput.disabled = multi;
+  lenInput.disabled = multi;
+
+  idInput.value  = multi ? '(multiple)' : first.id;
+  rowInput.value = multi ? '' : first.row + 1;
+  colInput.value = multi ? '' : first.col + 1;
+  lenInput.value = multi ? '' : first.length;
+
+  const selArr = [...selectedIds].map(i => fields[i]);
+  const colors = new Set(selArr.map(f => f.color));
+  const hls    = new Set(selArr.map(f => f.highlight));
+
+  setColorPickerValue(colors.size === 1 ? first.color : 'default');
+  hlSel.value = hls.size === 1 ? first.highlight : 'off';
+}
+
+// Color options data — must match the HTML picker options
+const COLOR_OPTIONS = [
+  { value: 'default',   hex: '',        label: 'Default'   },
+  { value: 'pink',      hex: '#ff69b4', label: 'Pink'      },
+  { value: 'red',       hex: '#ff4444', label: 'Red'       },
+  { value: 'green',     hex: '#44ff44', label: 'Green'     },
+  { value: 'turquoise', hex: '#44ffee', label: 'Turquoise' },
+  { value: 'blue',      hex: '#4488ff', label: 'Blue'      },
+  { value: 'neutral',   hex: '',        label: 'Neutral'   },
+  { value: 'yellow',    hex: '#ffff44', label: 'Yellow'    },
+];
+
+function setColorPickerValue(val) {
+  const opt = COLOR_OPTIONS.find(o => o.value === val) || COLOR_OPTIONS[0];
+  const swatchEl = document.getElementById('colorPickerSwatch');
+  const labelEl  = document.getElementById('colorPickerLabel');
+  if (swatchEl) {
+    if (opt.hex) {
+      swatchEl.className = 'cp-swatch';
+      swatchEl.style.background = opt.hex;
+    } else {
+      swatchEl.className = 'cp-swatch cp-swatch-auto';
+      swatchEl.style.background = '';
+    }
+  }
+  if (labelEl) labelEl.textContent = opt.label;
+  const menu = document.getElementById('colorPickerMenu');
+  if (menu) {
+    menu.querySelectorAll('.cp-option').forEach(el => {
+      el.classList.toggle('cp-selected', el.dataset.value === val);
+    });
+  }
+}
+
+function getColorPickerValue() {
+  const sel = document.querySelector('#colorPickerMenu .cp-option.cp-selected');
+  return sel ? sel.dataset.value : 'default';
+}
+
+function updatePanelAndOverlay(mapDef, fields, cells) {
+  updatePanel(fields);
+  SelectionOverlay.resize(mapDef);
+  SelectionOverlay.draw(mapDef, selectedIds, fields);
+}
+
+/* ===========================================================
+   MODULE: HISTORY  (Undo / Redo)
+   Uses JSON round-trip to deep-clone the entire fields array so
+   any future field properties are automatically captured.
+   =========================================================== */
+const History = (() => {
+  let undoStack = [];
+  let redoStack = [];
+
+  function snapshot() {
+    return JSON.parse(JSON.stringify(fields));
+  }
+
+  // Call BEFORE mutating fields (captures current state, clears redo)
+  function push() {
+    undoStack.push(snapshot());
+    if (undoStack.length > MAX_UNDO_STEPS) undoStack.shift();
+    redoStack = [];
+  }
+
+  // Push an externally-captured snapshot (used after drag completes)
+  function pushRaw(snap) {
+    undoStack.push(snap);
+    if (undoStack.length > MAX_UNDO_STEPS) undoStack.shift();
+    redoStack = [];
+  }
+
+  function restore(snap) {
+    fields.length = 0;
+    snap.forEach(f => fields.push(f));
+    selectedIds.clear();
+    if (!mapDef) return;
+    FieldRenderer.applyAll(mapDef, fields, cells, fillMode);
+    SelectionOverlay.resize(mapDef);
+    SelectionOverlay.draw(mapDef, selectedIds, fields);
+    updatePanel(fields);
+  }
+
+  function undo() {
+    if (!undoStack.length) return;
+    redoStack.push(snapshot());
+    restore(undoStack.pop());
+  }
+
+  function redo() {
+    if (!redoStack.length) return;
+    undoStack.push(snapshot());
+    if (undoStack.length > MAX_UNDO_STEPS) undoStack.shift();
+    restore(redoStack.pop());
+  }
+
+  function clear() { undoStack = []; redoStack = []; }
+
+  return { push, pushRaw, undo, redo, clear };
+})();
+
+/* ===========================================================
+   DELETE SELECTED FIELDS
+   =========================================================== */
+function deleteSelected() {
+  if (selectedIds.size === 0 || !mapDef) return;
+  History.push();
+  // Sort descending so splice doesn't shift indices of remaining items
+  const toRemove = [...selectedIds].sort((a, b) => b - a);
+  toRemove.forEach(idx => fields.splice(idx, 1));
+  selectedIds.clear();
+  FieldRenderer.applyAll(mapDef, fields, cells, fillMode);
+  SelectionOverlay.resize(mapDef);
+  SelectionOverlay.draw(mapDef, selectedIds, fields);
+  updatePanel(fields);
+}
+
+/* ===========================================================
+   GENERATE BMS SOURCE
+   Builds a simplified BMS assembler listing from current fields.
+   =========================================================== */
+function generateBmsSource() {
+  if (!mapDef) return '';
+  const lines = [];
+  lines.push('MAPSET   DFHMSD TYPE=MAP,CTRL=FREEKB');
+  lines.push(`MAPNAME  DFHMDI SIZE=(${mapDef.rows},${mapDef.cols}),LINE=1,COLUMN=1`);
+  fields.forEach(f => {
+    const attrs = [`POS=(${f.row + 1},${f.col + 1})`, `LENGTH=${f.length}`];
+    if (f.prot)   attrs.push('PROT');
+    if (f.unprot) attrs.push('UNPROT');
+    if (f.color && f.color !== 'default' && f.color !== 'neutral')
+      attrs.push('COLOR=' + f.color.toUpperCase());
+    if (f.highlight && f.highlight !== 'off')
+      attrs.push('HILIGHT=' + f.highlight.toUpperCase());
+    if (f.initialText) attrs.push(`INITIAL='${f.initialText}'`);
+    lines.push(`${f.id.padEnd(8)} DFHMDF ${attrs.join(',')}`);
+  });
+  lines.push('         DFHMSD TYPE=FINAL');
+  return lines.join('\n');
+}
+
+/* ===========================================================
+   MAIN: RENDER
+   =========================================================== */
+function renderBms() {
+  History.clear();
+  mapDef = Parser.parseMap(bmsSource);
+  fields = Parser.parseFields(bmsSource);
+  cells  = GridBuilder.build(mapDef);
+
+  FieldRenderer.applyAll(mapDef, fields, cells, fillMode);
+  applyGridTheme();
+
+  // Size cells to fit container, then draw overlay
+  requestAnimationFrame(() => {
+    fitGrid(mapDef);
+  });
+
+  // Attach interaction (re-init on every render)
+  Interaction.init(mapDef, fields, cells);
+}
+
+/* ===========================================================
+   MODULE: PALETTE DRAG
+   Handles dragging items from the palette panel onto the BMS
+   grid to create new fields.
+   =========================================================== */
+const PaletteDrag = (() => {
+  let dragItem      = null;   // { ftype, length }
+  let dropCoords    = null;   // { row, col } or null
+  let dropColliding = false;
+  let ghost         = null;
+  let moveHandler   = null;
+  let upHandler     = null;
+  let fieldCounter  = 0;
+
+  // Representative ghost text for each type + length
+  const GHOST_TEXT = {
+    label:     { 1: 'A', 8: 'Label   ', 16: 'Long Label      ' },
+    inputtext: { 1: '_', 8: '________', 16: '________________' },
+    inputnum:  { 1: '0', 8: '00000000', 16: '0000000000000000' },
+  };
+
+  function genId(ftype) {
+    return ftype.slice(0, 3).toUpperCase() + String(++fieldCounter).padStart(4, '0');
+  }
+
+  function init() {
+    ghost = document.getElementById('paletteDragGhost');
+    document.querySelectorAll('.palette-item[data-ftype]').forEach(el => {
+      el.addEventListener('mousedown', e => start(e, el));
+    });
+  }
+
+  function start(e, el) {
+    if (e.button !== 0) return;
+    const ftype = el.dataset.ftype;
+    if (ftype === 'array') return;   // not yet implemented
+    e.preventDefault();
+
+    dragItem   = { ftype, length: parseInt(el.dataset.length, 10) };
+    dropCoords = null;
+
+    // Clear grid selection so existing fields don't show collision state
+    selectedIds.clear();
+    SelectionOverlay.setColliding(false);
+
+    const gt = (GHOST_TEXT[ftype] || {})[dragItem.length] || ftype + ':' + dragItem.length;
+    ghost.textContent = gt;
+    ghost.style.left    = e.clientX + 'px';
+    ghost.style.top     = e.clientY + 'px';
+    ghost.style.display = 'block';
+    document.body.style.cursor = 'grabbing';
+
+    moveHandler = onMove;
+    upHandler   = onUp;
+    window.addEventListener('mousemove', moveHandler);
+    window.addEventListener('mouseup',   upHandler);
+  }
+
+  function onMove(e) {
+    if (!dragItem || !mapDef) return;
+
+    ghost.style.left = e.clientX + 'px';
+    ghost.style.top  = e.clientY + 'px';
+
+    const grid = document.getElementById('bmsGrid');
+    if (!grid) return;
+    const r = grid.getBoundingClientRect();
+
+    if (e.clientX >= r.left && e.clientX <= r.right &&
+        e.clientY >= r.top  && e.clientY <= r.bottom) {
+      const cellW = r.width  / mapDef.cols;
+      const cellH = r.height / mapDef.rows;
+      const col   = Math.min(
+        Math.max(0, Math.floor((e.clientX - r.left) / cellW)),
+        mapDef.cols - dragItem.length
+      );
+      const row   = Math.min(
+        Math.max(0, Math.floor((e.clientY - r.top) / cellH)),
+        mapDef.rows - 1
+      );
+      dropCoords    = { row, col };
+      dropColliding = fieldCollides({ row, col, length: dragItem.length }, fields, null);
+      SelectionOverlay.setColliding(dropColliding);
+      SelectionOverlay.setDropPreview({ row, col, length: dragItem.length });
+    } else {
+      dropCoords    = null;
+      dropColliding = false;
+      SelectionOverlay.setColliding(false);
+      SelectionOverlay.setDropPreview(null);
+    }
+
+    SelectionOverlay.resize(mapDef);
+    SelectionOverlay.draw(mapDef, selectedIds, fields);
+  }
+
+  function onUp() {
+    window.removeEventListener('mousemove', moveHandler);
+    window.removeEventListener('mouseup',   upHandler);
+
+    ghost.style.display = 'none';
+    document.body.style.cursor = '';
+    SelectionOverlay.setColliding(false);
+    SelectionOverlay.setDropPreview(null);
+
+    if (dropCoords && dragItem && mapDef && !dropColliding) {
+      const { row, col } = dropCoords;
+      const { ftype, length } = dragItem;
+      const isProt = ftype === 'label';
+      const newField = {
+        id:          genId(ftype),
+        row,
+        col,
+        length,
+        initialText: isProt ? 'Label' : '',
+        prot:        isProt,
+        unprot:      !isProt,
+        color:       'default',
+        highlight:   'off',
+      };
+      History.push();
+      fields.push(newField);
+      FieldRenderer.applyAll(mapDef, fields, cells, fillMode);
+      selectedIds.clear();
+      selectedIds.add(fields.length - 1);
+      updatePanelAndOverlay(mapDef, fields, cells);
+    } else if (mapDef) {
+      // Cancelled or colliding — wipe the drop-preview without adding anything
+      SelectionOverlay.resize(mapDef);
+      SelectionOverlay.draw(mapDef, selectedIds, fields);
+    }
+
+    dragItem   = null;
+    dropCoords = null;
+  }
+
+  return { init };
+})();
+
+/* ===========================================================
+   BOOT
+   =========================================================== */
+document.addEventListener('DOMContentLoaded', () => {
+  const renderView    = document.getElementById('renderView');
+  const sourceView    = document.getElementById('sourceView');
+  const renderBtn     = document.getElementById('renderBtn');
+  const sourceBtn     = document.getElementById('sourceBtn');
+  const fillSelect    = document.getElementById('fillSelect');
+  const renderControls = document.getElementById('renderControls');
+  const hlSel         = document.getElementById('panelHighlight');
+  const rowInput      = document.getElementById('panelRow');
+  const colInput      = document.getElementById('panelCol');
+  const lenInput      = document.getElementById('panelLen');
+
+  sourceView.textContent = bmsSource;
+
+  /* -- view toggle -- */
+  renderBtn.addEventListener('click', () => {
+    renderView.style.display    = 'block';
+    sourceView.style.display    = 'none';
+    renderControls.style.display = 'flex';
+    renderBtn.classList.add('active');
+    sourceBtn.classList.remove('active');
+  });
+
+  sourceBtn.addEventListener('click', () => {
+    renderView.style.display    = 'none';
+    sourceView.style.display    = 'block';
+    renderControls.style.display = 'none';
+    sourceBtn.classList.add('active');
+    renderBtn.classList.remove('active');
+  });
+
+  /* -- save button -- */
+  function doSave() {
+    const vsc = getVsCodeApi();
+    if (vsc) vsc.postMessage({ command: 'saveBms', content: generateBmsSource() });
+  }
+  document.getElementById('saveBtn').addEventListener('click', doSave);
+
+  /* -- auto-sync: writes generated source into the editor document (unsaved) every 10s -- */
+  function doSync() {
+    const vsc = getVsCodeApi();
+    if (vsc) vsc.postMessage({ command: 'syncBms', content: generateBmsSource() });
+  }
+  let autoSyncTimer = null;
+  document.getElementById('autoSyncChk').addEventListener('change', e => {
+    if (e.target.checked) {
+      autoSyncTimer = setInterval(doSync, 10000);
+    } else {
+      clearInterval(autoSyncTimer);
+      autoSyncTimer = null;
     }
   });
-}
 
-/* ---------------------------
-   RENDER
---------------------------- */
-function render() {
-  renderView.innerHTML = '';
+  /* -- fill change -- */
+  fillSelect.addEventListener('change', () => {
+    fillMode = fillSelect.value;
+    FieldRenderer.applyAll(mapDef, fields, cells, fillMode);
+    SelectionOverlay.draw(mapDef, selectedIds, fields);
+  });
 
-  const map = parseMap(bmsSource);
-  const fields = parseFields(bmsSource);
-  const { grid, cells } = createGrid(map);
+  /* -- delete button + Delete key shortcut + Ctrl+Z/Y undo/redo -- */
+  document.getElementById('deleteBtn').addEventListener('click', deleteSelected);
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey &&
+        (e.key === 'z' || e.key === 'Z') && !InlineEditor.isActive()) {
+      e.preventDefault(); History.undo(); return;
+    }
+    if ((e.ctrlKey || e.metaKey) &&
+        (e.key === 'y' || e.key === 'Y') && !InlineEditor.isActive()) {
+      e.preventDefault(); History.redo(); return;
+    }
+    if ((e.key === 'Delete' || e.key === 'Backspace') &&
+        selectedIds.size > 0 && !InlineEditor.isActive()) {
+      e.preventDefault();
+      deleteSelected();
+    }
+  });
 
-  applyFields(cells, map, fields);
-  renderView.appendChild(grid);
-}
+  /* -- panel: ID rename (single selection only, max 20 chars) -- */
+  document.getElementById('panelId').addEventListener('change', e => {
+    if (selectedIds.size !== 1) return;
+    const val = e.target.value.trim().slice(0, 20);
+    if (val) { History.push(); fields[[...selectedIds][0]].id = val; e.target.value = val; }
+    else e.target.value = fields[[...selectedIds][0]].id; // reject empty
+  });
 
-render();
+  /* -- color picker -- */
+  const cpTrigger = document.getElementById('colorPickerTrigger');
+  const cpMenu    = document.getElementById('colorPickerMenu');
 
-/* ---------------------------
-   UI CONTROLS
---------------------------- */
-document.getElementById('renderBtn').onclick = () => {
-  renderView.style.display = 'block';
-  sourceView.style.display = 'none';
-};
+  cpTrigger.addEventListener('click', e => {
+    e.stopPropagation();
+    cpMenu.classList.toggle('open');
+  });
 
-document.getElementById('sourceBtn').onclick = () => {
-  renderView.style.display = 'none';
-  sourceView.style.display = 'block';
-};
+  cpMenu.addEventListener('click', e => {
+    e.stopPropagation();
+    const opt = e.target.closest('.cp-option');
+    if (!opt) return;
+    cpMenu.classList.remove('open');
+    setColorPickerValue(opt.dataset.value);
+    History.push();
+    selectedIds.forEach(idx => {
+      fields[idx].color = opt.dataset.value;
+      FieldRenderer.refreshField(mapDef, cells, fields[idx], idx, fillMode);
+    });
+    SelectionOverlay.draw(mapDef, selectedIds, fields);
+  });
 
-document.getElementById('themeBtn').onclick = () => {
-  document.body.classList.toggle('light');
-};
+  document.addEventListener('click', () => cpMenu.classList.remove('open'));
+
+  /* -- panel: highlight change -- */
+  hlSel.addEventListener('change', () => {
+    History.push();
+    selectedIds.forEach(idx => {
+      fields[idx].highlight = hlSel.value;
+      FieldRenderer.refreshField(mapDef, cells, fields[idx], idx, fillMode);
+    });
+    SelectionOverlay.draw(mapDef, selectedIds, fields);
+  });
+
+  /* -- panel: row/col/len change reflects on render -- */
+  function applyPositionFromPanel() {
+    if (selectedIds.size !== 1) return;
+    const idx = [...selectedIds][0];
+    const f   = fields[idx];
+    const r   = parseInt(rowInput.value, 10);
+    const c   = parseInt(colInput.value, 10);
+    const l   = parseInt(lenInput.value, 10);
+
+    // Compute candidate values, falling back to current field values if out of range
+    const newRow = (!isNaN(r) && r >= 1 && r <= mapDef.rows)          ? r - 1 : f.row;
+    const newCol = (!isNaN(c) && c >= 1 && c <= mapDef.cols)          ? c - 1 : f.col;
+    const newLen = (!isNaN(l) && l >= 1 && l <= mapDef.cols - newCol) ? l     : f.length;
+
+    // Reject if the new position/size would overlap another field
+    if (fieldCollides({ row: newRow, col: newCol, length: newLen }, fields, new Set([idx]))) {
+      rowInput.value = String(f.row + 1);
+      colInput.value = String(f.col + 1);
+      lenInput.value = String(f.length);
+      return;
+    }
+
+    History.push();
+    f.row    = newRow;
+    f.col    = newCol;
+    f.length = newLen;
+    FieldRenderer.applyAll(mapDef, fields, cells, fillMode);
+    SelectionOverlay.resize(mapDef);
+    SelectionOverlay.draw(mapDef, selectedIds, fields);
+  }
+  rowInput.addEventListener('change', applyPositionFromPanel);
+  colInput.addEventListener('change', applyPositionFromPanel);
+  lenInput.addEventListener('change', applyPositionFromPanel);
+
+  /* -- theme toggle -- */
+  document.getElementById('themeBtn').addEventListener('click', () => {
+    gridTheme = gridTheme === 'dark' ? 'light' : 'dark';
+    applyGridTheme();
+    FieldRenderer.applyAll(mapDef, fields, cells, fillMode);
+    SelectionOverlay.draw(mapDef, selectedIds, fields);
+  });
+
+  /* -- refit grid on container resize -- */
+  const resizeObserver = new ResizeObserver(() => {
+    fitGrid(mapDef);
+  });
+  resizeObserver.observe(document.getElementById('canvasArea'));
+
+  /* -- init overlay + render -- */
+  SelectionOverlay.init();
+  PaletteDrag.init();
+  renderBms();
+});
 </script>
 </body>
 </html>
+

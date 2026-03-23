@@ -89,8 +89,8 @@
         "column": {
             "patterns": [
                 {
-                    "match": "(?<=^.{71})X",
-                    "name": "string.regexp.continuar.bms"
+                    "match": "(?<=^.{71})\\S.*$",
+                    "name": "comment.line.continuation.bms"
                 }
             ]
         },
