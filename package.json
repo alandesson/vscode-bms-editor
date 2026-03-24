@@ -4,7 +4,7 @@
   "description": "BMS renderer and language support ",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.109.0"
   },
   "categories": [
     "Other"
@@ -38,7 +38,8 @@
     "commands": [
       {
         "command": "bms-renderer.render",
-        "title": "Open BMS Renderer"
+        "title": "Open BMS Renderer",
+        "icon": "$(eye)"
       }
     ],
     "languages": [

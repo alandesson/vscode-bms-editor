@@ -8,14 +8,28 @@ export function openBmsRenderer(context: vscode.ExtensionContext, document: vsco
         'BMS Renderer',
         vscode.ViewColumn.Beside,
         {
-            enableScripts: true
+            enableScripts: true,
+            localResourceRoots: [
+                vscode.Uri.joinPath(context.extensionUri, 'src', 'media')
+            ]
         }
     );
 
     const bmsSource = document.getText();
     const fileName = document.uri.path.split('/').pop()?.replace(/\.bms$/i, '') ?? 'BMS';
 
-    panel.webview.html = getWebviewContent(context, fileName, bmsSource);
+    panel.webview.html = getWebviewContent(context, panel.webview, fileName, bmsSource);
+
+    // Prevent echo-back when we ourselves apply a WorkspaceEdit
+    let applyingSync = false;
+
+    // Push file changes into the renderer immediately
+    const changeDisposable = vscode.workspace.onDidChangeTextDocument(e => {
+        if (e.document.uri.toString() !== document.uri.toString()) return;
+        if (applyingSync) return;
+        panel.webview.postMessage({ command: 'updateSource', source: e.document.getText() });
+    });
+    panel.onDidDispose(() => changeDisposable.dispose());
 
     // Handle messages from the webview
     panel.webview.onDidReceiveMessage(async message => {
@@ -30,13 +44,20 @@ export function openBmsRenderer(context: vscode.ExtensionContext, document: vsco
                 `Saved: ${path.basename(document.uri.fsPath)}`
             );
         } else if (message.command === 'syncBms') {
-            const edit = new vscode.WorkspaceEdit();
-            const fullRange = new vscode.Range(
-                document.positionAt(0),
-                document.positionAt(document.getText().length)
-            );
-            edit.replace(document.uri, fullRange, message.content as string);
-            await vscode.workspace.applyEdit(edit);
+            const newContent = message.content as string;
+            if (document.getText() === newContent) return;
+            applyingSync = true;
+            try {
+                const edit = new vscode.WorkspaceEdit();
+                const fullRange = new vscode.Range(
+                    document.positionAt(0),
+                    document.positionAt(document.getText().length)
+                );
+                edit.replace(document.uri, fullRange, newContent);
+                await vscode.workspace.applyEdit(edit);
+            } finally {
+                applyingSync = false;
+            }
         }
     }, undefined, context.subscriptions);
 }
@@ -64,18 +85,27 @@ function escapeRegex(s: string): string {
     return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function getWebviewContent(context: vscode.ExtensionContext, fileName: string, bmsSource: string): string {
-    const htmlPath = path.join(
-        context.extensionPath,
-        'src',
-        'media',
-        'renderer.html'
-      );
+function getWebviewContent(
+    context: vscode.ExtensionContext,
+    webview: vscode.Webview,
+    fileName: string,
+    bmsSource: string
+): string {
+    const htmlPath = path.join(context.extensionPath, 'src', 'media', 'renderer.html');
 
-      let html = fs.readFileSync(htmlPath, 'utf8');
-      html = html
+    const cssUri = webview.asWebviewUri(
+        vscode.Uri.joinPath(context.extensionUri, 'src', 'media', 'renderer.css')
+    );
+    const jsUri = webview.asWebviewUri(
+        vscode.Uri.joinPath(context.extensionUri, 'src', 'media', 'renderer.js')
+    );
+
+    let html = fs.readFileSync(htmlPath, 'utf8');
+    html = html
         .replaceAll('{{TITLE}}', fileName)
-        .replace('"{{SOURCE}}"', JSON.stringify(bmsSource));
+        .replace('"{{SOURCE}}"', JSON.stringify(bmsSource))
+        .replace('{{CSS_URI}}', cssUri.toString())
+        .replace('{{JS_URI}}', jsUri.toString());
 
-      return html;
+    return html;
 }

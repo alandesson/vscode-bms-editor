@@ -53,7 +53,7 @@
         "constants": {
             "patterns": [
                 {
-                    "match": "\\b(TRUE|3270-2|FALSE|ON|OFF|NULL|ASKIP|NORM|UNPROT|PROT|BRT|FINAL|FREEKB|AUTO|COBOL|INOUT|YES|NO)\\b",
+                    "match": "\\b(TRUE|3270|3270-2|FALSE|ON|OFF|NULL|ASKIP|NORM|UNPROT|PROT|BRT|NUM|FINAL|FREEKB|AUTO|COBOL|INOUT|YES|NO)\\b",
                     "name": "constant.language.bms"
                 },
                 {

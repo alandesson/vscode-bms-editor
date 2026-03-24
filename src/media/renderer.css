@@ -1,0 +1,390 @@
+/* =====================================================
+   VSCode integration: inherit editor theme variables.
+   The navbar and panels use VSCode's CSS variables so
+   they follow the active theme automatically.
+   The grid area uses its own fixed palette so it
+   always looks like a terminal screen.
+   ===================================================== */
+
+/* ---------- navbar / shell (VSCode themed) ---------- */
+body {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--vscode-editor-background);
+  color: var(--vscode-editor-foreground);
+  font-family: var(--vscode-font-family, monospace);
+  font-size: var(--vscode-font-size, 13px);
+}
+
+.navbar {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 4px 10px;
+  gap: 6px;
+  background: var(--vscode-editor-background);
+  border-bottom: 1px solid var(--vscode-panel-border, #444);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  padding: 3px 10px;
+  gap: 6px;
+  background: var(--vscode-editor-background);
+  border-bottom: 1px solid var(--vscode-panel-border, #444);
+}
+
+.navbar .title {
+  flex: 1;
+  font-weight: bold;
+  color: var(--vscode-editor-foreground);
+}
+
+/* VSCode-style buttons */
+.vsc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  border: 1px solid var(--vscode-button-border, transparent);
+  background: var(--vscode-button-secondaryBackground, transparent);
+  color: var(--vscode-button-secondaryForeground, var(--vscode-editor-foreground));
+  font-family: inherit;
+  font-size: inherit;
+  border-radius: 2px;
+  line-height: 1.6;
+}
+.vsc-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground, rgba(128,128,128,0.15));
+}
+.vsc-btn.active {
+  background: var(--vscode-button-background, #0078d4);
+  color: var(--vscode-button-foreground, #fff);
+  border-color: var(--vscode-button-background, #0078d4);
+}
+
+/* VSCode-style select */
+.vsc-select {
+  background: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  border: 1px solid var(--vscode-dropdown-border);
+  padding: 2px 4px;
+  font-family: inherit;
+  font-size: inherit;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+/* VSCode-style input */
+.vsc-input {
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, #555);
+  padding: 2px 6px;
+  font-family: inherit;
+  font-size: inherit;
+  border-radius: 2px;
+  width: 80px;
+}
+.vsc-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---------- scroll area ---------- */
+.canvas-area {
+  flex: 1;
+  overflow: auto;
+  padding: 10px;
+  position: relative;
+}
+
+/* ---------- source view ---------- */
+#sourceView {
+  white-space: pre;
+  display: none;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: var(--vscode-editor-font-size, 13px);
+  color: var(--vscode-editor-foreground);
+}
+
+/* ---------- grid wrapper: own background ---------- */
+.grid-wrapper {
+  position: relative;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  border: 2px solid var(--grid-border, rgba(128,128,128,0.4));
+}
+
+/* The grid itself uses terminal-like fixed colors */
+.bms-grid {
+  display: grid;
+  font-family: 'Courier New', Courier, monospace;
+  background: var(--grid-bg);
+  color: var(--grid-fg);
+  user-select: none;
+  position: relative;
+}
+
+/* Selection overlay canvas (absolutely positioned over grid) */
+#selectionOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.grid-cell {
+  overflow: hidden;
+  box-sizing: border-box;
+  white-space: pre;
+  /* width/height controlled by grid track size, set in JS */
+}
+
+/* Field cell: slightly highlighted background by default */
+.grid-cell.is-field {
+  cursor: pointer;
+}
+
+/* ---------- bottom panel (VSCode themed) ---------- */
+#fieldPanel {
+  flex-shrink: 0;
+  display: none;
+  padding: 6px 12px;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--vscode-panel-border, #444);
+  background: var(--vscode-panel-background, var(--vscode-editor-background));
+  color: var(--vscode-panel-foreground, var(--vscode-editor-foreground));
+  font-size: 12px;
+}
+
+.panel-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.panel-label {
+  color: var(--vscode-descriptionForeground, #888);
+  font-size: 11px;
+}
+
+/* ---- Custom color picker ---- */
+.color-picker {
+  position: relative;
+  display: inline-flex;
+}
+
+.color-picker-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 110px;
+  text-align: left;
+}
+
+.cp-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  border: 1px solid rgba(128,128,128,0.5);
+  flex-shrink: 0;
+}
+
+.cp-swatch-auto {
+  background: var(--grid-fg, #ffffff);
+  border-radius: 0;
+}
+
+.cp-arrow {
+  opacity: 0.6;
+  margin-left: auto;
+  padding-left: 4px;
+  font-size: 10px;
+}
+
+.color-picker-menu {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 0;
+  z-index: 1000;
+  background: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  border: 1px solid var(--vscode-dropdown-border);
+  border-radius: 2px;
+  min-width: 130px;
+  padding: 2px 0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.color-picker-menu.open {
+  display: block;
+}
+
+.cp-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.cp-option:hover {
+  background: var(--vscode-list-hoverBackground, rgba(128,128,128,0.2));
+}
+
+.cp-option.cp-selected {
+  background: var(--vscode-list-activeSelectionBackground, rgba(0,120,212,0.25));
+}
+
+/* ---- Palette Panel ---- */
+#palettePanel {
+  flex-shrink: 0;
+  display: flex;
+  padding: 5px 12px;
+  border-top: 1px solid var(--vscode-panel-border, #444);
+  background: var(--vscode-panel-background, var(--vscode-editor-background));
+  color: var(--vscode-panel-foreground, var(--vscode-editor-foreground));
+  font-size: 12px;
+  gap: 0;
+}
+
+.palette-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 8px;
+  min-width: 0;
+  border-right: 1px solid var(--vscode-panel-border, #333);
+}
+.palette-col:first-child { padding-left: 0; }
+.palette-col:last-child  { border-right: none; padding-right: 0; }
+
+.palette-col-header {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  margin-bottom: 1px;
+  white-space: nowrap;
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 5px;
+  cursor: grab;
+  border: 1px solid var(--vscode-panel-border, #444);
+  border-radius: 2px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  user-select: none;
+}
+.palette-item:hover {
+  border-color: var(--vscode-focusBorder, #007fd4);
+  background: var(--vscode-list-hoverBackground, rgba(128,128,128,0.15));
+}
+.palette-item:active { cursor: grabbing; }
+
+/* size badge ("1" / "8" / "16" / "H" / "V") */
+.palette-item-size {
+  font-size: 9px;
+  color: var(--vscode-descriptionForeground, #888);
+  flex-shrink: 0;
+  min-width: 14px;
+  text-align: right;
+}
+
+/* text content preview */
+.palette-item-preview {
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+}
+
+/* input-type items show underline like real fields */
+.palette-item[data-ftype="inputtext"] .palette-item-preview,
+.palette-item[data-ftype="inputnum"]  .palette-item-preview {
+  text-decoration: underline;
+}
+
+/* arrays are not yet implemented */
+.palette-item[data-ftype="array"] {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* Ghost element that follows the cursor while dragging a palette item */
+#paletteDragGhost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  background: var(--vscode-button-background, #007fd4);
+  color: var(--vscode-button-foreground, #fff);
+  border: 1px dashed rgba(255,255,255,0.6);
+  border-radius: 2px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  padding: 2px 6px;
+  white-space: pre;
+  transform: translate(10px, 10px);
+  display: none;
+  opacity: 0.9;
+}
+
+/* ---- Context menu ---- */
+#ctxMenu {
+  position: fixed;
+  z-index: 10000;
+  background: var(--vscode-menu-background, #252526);
+  border: 1px solid var(--vscode-menu-border, #454545);
+  border-radius: 3px;
+  padding: 4px 0;
+  min-width: 160px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  display: none;
+}
+.ctx-item {
+  padding: 5px 16px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--vscode-menu-foreground, #cccccc);
+  user-select: none;
+}
+.ctx-item:hover:not(.ctx-disabled) {
+  background: var(--vscode-menu-selectionBackground, #0e639c);
+  color: var(--vscode-menu-selectionForeground, #ffffff);
+}
+.ctx-disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.ctx-sep {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--vscode-menu-separatorBackground, #454545);
+}
