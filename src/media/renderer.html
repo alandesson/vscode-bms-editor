@@ -38,6 +38,9 @@
   <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;" title="Keep renderer and source file in sync: file edits update renderer, renderer edits update file">
     <input type="checkbox" id="autoSyncChk"> Sync
   </label>
+  <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;" title="Automatically grow label fields to fit the text you type (text is truncated if another field would be overlapped)">
+    <input type="checkbox" id="autoResizeChk"> Auto-resize
+  </label>
 </div>
 
 <!-- ===================== SCROLL AREA ============ -->
@@ -48,6 +51,7 @@
       <div class="bms-grid" id="bmsGrid"></div>
       <canvas id="selectionOverlay"></canvas>
     </div>
+    <div id="gridMsg"></div>
   </div>
 
   <!-- source view -->
@@ -56,79 +60,129 @@
 
 <!-- ===================== FIELD PANEL ============= -->
 <div id="fieldPanel">
-  <div class="panel-group">
-    <span class="panel-label">ID</span>
-    <input class="vsc-input" id="panelId" type="text" maxlength="20" style="width:70px;" />
-  </div>
-  <div class="panel-group">
-    <span class="panel-label">Row</span>
-    <input class="vsc-input" id="panelRow" type="number" style="width:50px;" />
-    <span class="panel-label">Col</span>
-    <input class="vsc-input" id="panelCol" type="number" style="width:50px;" />
-    <span class="panel-label">Len</span>
-    <input class="vsc-input" id="panelLen" type="number" style="width:50px;" />
-  </div>
-  <div class="panel-group" id="panelTextGroup" style="display:none;">
-    <span class="panel-label">Text</span>
-    <input class="vsc-input" id="panelText" type="text" style="width:200px;" />
-  </div>
-  <div class="panel-group">
-    <span class="panel-label">Type</span>
-    <select class="vsc-select" id="panelType">
-      <option value="">—</option>
-      <option value="unprot">UNPROT</option>
-      <option value="prot">PROT</option>
-      <option value="askip">ASKIP</option>
-    </select>
-  </div>
-  <div class="panel-group">
-    <span class="panel-label">Color</span>
-    <div class="color-picker" id="colorPicker">
-      <button type="button" class="vsc-btn color-picker-trigger" id="colorPickerTrigger">
-        <span class="cp-swatch cp-swatch-auto" id="colorPickerSwatch"></span>
-        <span id="colorPickerLabel">Default</span>
-        <span class="cp-arrow">&#9662;</span>
-      </button>
-      <div class="color-picker-menu" id="colorPickerMenu">
-        <div class="cp-option cp-selected" data-value="default" data-color=""><span class="cp-swatch cp-swatch-auto"></span><span>Default</span></div>
-        <div class="cp-option" data-value="pink" data-color="#ff69b4"><span class="cp-swatch" style="background:#ff69b4;"></span><span>Pink</span></div>
-        <div class="cp-option" data-value="red" data-color="#ff4444"><span class="cp-swatch" style="background:#ff4444;"></span><span>Red</span></div>
-        <div class="cp-option" data-value="green" data-color="#44ff44"><span class="cp-swatch" style="background:#44ff44;"></span><span>Green</span></div>
-        <div class="cp-option" data-value="turquoise" data-color="#44ffee"><span class="cp-swatch" style="background:#44ffee;"></span><span>Turquoise</span></div>
-        <div class="cp-option" data-value="blue" data-color="#4488ff"><span class="cp-swatch" style="background:#4488ff;"></span><span>Blue</span></div>
-        <div class="cp-option" data-value="neutral" data-color=""><span class="cp-swatch cp-swatch-auto"></span><span>Neutral</span></div>
-        <div class="cp-option" data-value="yellow" data-color="#ffff44"><span class="cp-swatch" style="background:#ffff44;"></span><span>Yellow</span></div>
-      </div>
+
+  <!-- Line 1-->
+  <div class="panel-row">
+    <div class="panel-group panel-group-stretch panel-group-id">
+      <span class="panel-label">ID</span>
+      <input class="vsc-input panel-input-grow" id="panelId" type="text" maxlength="25" title="Up to 25 characters. Letters, numbers, and hyphens only." />
+    </div>
+    <div class="panel-group panel-group-stretch panel-group-metrics">
+      <span class="panel-label">Row</span>
+      <input class="vsc-input panel-input-compact" id="panelRow" type="number" />
+      <span class="panel-label">Col</span>
+      <input class="vsc-input panel-input-compact" id="panelCol" type="number" />
+      <span class="panel-label">Len</span>
+      <input class="vsc-input panel-input-compact" id="panelLen" type="number" />
+    </div>
+    <div class="panel-group panel-group-stretch" id="panelTextGroup" style="display:none;">
+      <span class="panel-label">Text</span>
+      <input class="vsc-input panel-input-grow" id="panelText" type="text" />
     </div>
   </div>
-  <div class="panel-group">
-    <span class="panel-label">Highlight</span>
-    <select class="vsc-select" id="panelHighlight">
-      <option value="off">Off</option>
-      <option value="blink">Blink</option>
-      <option value="reverse">Reverse</option>
-      <option value="underline">Underline</option>
-    </select>
+
+  <!-- Line 2-->
+  <div class="panel-row">
+    <div class="panel-group panel-group-stretch">
+      <span class="panel-label">Type</span>
+      <select class="vsc-select panel-select-grow" id="panelType">
+        <option value="">—</option>
+        <option value="unprot">UNPROT</option>
+        <option value="prot">PROT</option>
+        <option value="askip">ASKIP</option>
+      </select>
+    </div>
+    <div class="panel-group panel-group-stretch">
+      <span class="panel-label">Color</span>
+      <div class="color-picker" id="colorPicker">
+        <button type="button" class="vsc-btn color-picker-trigger" id="colorPickerTrigger">
+          <span class="cp-swatch cp-swatch-auto" id="colorPickerSwatch"></span>
+          <span id="colorPickerLabel">Default</span>
+          <span class="cp-arrow">&#9662;</span>
+        </button>
+        <div class="color-picker-menu" id="colorPickerMenu">
+          <div class="cp-option cp-selected" data-value="default" data-color=""><span class="cp-swatch cp-swatch-auto"></span><span>Default</span></div>
+          <div class="cp-option" data-value="pink" data-color="#ff69b4"><span class="cp-swatch" style="background:#ff69b4;"></span><span>Pink</span></div>
+          <div class="cp-option" data-value="red" data-color="#ff4444"><span class="cp-swatch" style="background:#ff4444;"></span><span>Red</span></div>
+          <div class="cp-option" data-value="green" data-color="#44ff44"><span class="cp-swatch" style="background:#44ff44;"></span><span>Green</span></div>
+          <div class="cp-option" data-value="turquoise" data-color="#44ffee"><span class="cp-swatch" style="background:#44ffee;"></span><span>Turquoise</span></div>
+          <div class="cp-option" data-value="blue" data-color="#4488ff"><span class="cp-swatch" style="background:#4488ff;"></span><span>Blue</span></div>
+          <div class="cp-option" data-value="neutral" data-color=""><span class="cp-swatch cp-swatch-auto"></span><span>Neutral</span></div>
+          <div class="cp-option" data-value="yellow" data-color="#ffff44"><span class="cp-swatch" style="background:#ffff44;"></span><span>Yellow</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel-group panel-group-stretch">
+      <span class="panel-label">Highlight</span>
+      <select class="vsc-select panel-select-grow" id="panelHighlight">
+        <option value="off">Off</option>
+        <option value="blink">Blink</option>
+        <option value="reverse">Reverse</option>
+        <option value="underline">Underline</option>
+      </select>
+    </div>
+    <div class="panel-group panel-group-stretch">
+      <span class="panel-label">Brightness</span>
+      <select class="vsc-select panel-select-grow" id="panelBright">
+        <option value="">—</option>
+        <option value="norm">Norm</option>
+        <option value="brt">BRT</option>
+        <option value="drk">DRK</option>
+      </select>
+    </div>
   </div>
-  <div class="panel-group">
-    <span class="panel-label">Brightness</span>
-    <select class="vsc-select" id="panelBright">
-      <option value="">—</option>
-      <option value="norm">Norm</option>
-      <option value="brt">BRT</option>
-      <option value="drk">DRK</option>
-    </select>
+
+  <!-- Line 3 (attributes, outlines, arrays) -->
+  <div class="panel-row">
+    <div class="panel-group panel-group-stretch" id="panelAttrGroup">
+      <label style="display:flex;align-items:center;gap:3px;font-size:12px;" id="panelNumLabel" title="Numeric field">
+        <input type="checkbox" id="panelNum"> Number
+      </label>
+      <label style="display:flex;align-items:center;gap:3px;font-size:12px;" id="panelIcLabel" title="Initial cursor position">
+        <input type="checkbox" id="panelIc"> Insert Cursor
+      </label>
+      <label style="display:flex;align-items:center;gap:3px;font-size:12px;" id="panelFsetLabel" title="Set modified data tag">
+        <input type="checkbox" id="panelFset"> Field Set
+      </label>
+    </div>
+    <div class="panel-group panel-group-stretch" id="panelOutlineGroup">
+      <span class="panel-label">Outline</span>
+      <label style="display:flex;align-items:center;gap:3px;font-size:12px;" title="Top border (OUTLINE OVER)">
+        <input type="checkbox" id="panelOlOver"> Over
+      </label>
+      <label style="display:flex;align-items:center;gap:3px;font-size:12px;" title="Bottom border (OUTLINE UNDER)">
+        <input type="checkbox" id="panelOlUnder"> Under
+      </label>
+      <label style="display:flex;align-items:center;gap:3px;font-size:12px;" title="Left border (OUTLINE LEFT)">
+        <input type="checkbox" id="panelOlLeft"> Left
+      </label>
+      <label style="display:flex;align-items:center;gap:3px;font-size:12px;" title="Right border (OUTLINE RIGHT)">
+        <input type="checkbox" id="panelOlRight"> Right
+      </label>
+    </div>
+    <div class="panel-group panel-group-stretch" id="panelStopperRow" style="display:none;">
+      <label style="display:flex;align-items:center;gap:3px;font-size:12px;" title="Emit an ASKIP LENGTH=0 stopper field immediately to the right of this UNPROT field">
+        <input type="checkbox" id="panelStopper"> Stopper
+      </label>
+    </div>
   </div>
-  <div class="panel-group" id="panelAttrGroup">
-    <label style="display:flex;align-items:center;gap:3px;font-size:12px;" id="panelNumLabel" title="Numeric field">
-      <input type="checkbox" id="panelNum"> Number
-    </label>
-    <label style="display:flex;align-items:center;gap:3px;font-size:12px;" id="panelIcLabel" title="Initial cursor position">
-      <input type="checkbox" id="panelIc"> Cursor
-    </label>
-    <label style="display:flex;align-items:center;gap:3px;font-size:12px;" id="panelFsetLabel" title="Set modified data tag">
-      <input type="checkbox" id="panelFset"> Field Set
-    </label>
+
+  <!-- Line 4 (array settings) -->
+  <div class="panel-row">
+    <div id="panelArrayRow" class="panel-array-row" style="display:none;">
+      <div class="panel-group panel-group-stretch">
+        <span class="panel-label">Array Cols</span>
+        <input class="vsc-input panel-input-compact" id="panelArrayCols" type="number" min="1" max="200" title="Number of columns (horizontal elements)">
+        <span class="panel-label">Array Rows</span>
+        <input class="vsc-input panel-input-compact" id="panelArrayRows" type="number" min="1" max="200" title="Number of rows (vertical elements)">
+      </div>
+      <div class="panel-group panel-group-stretch">
+        <span class="panel-label">H Step</span>
+        <input class="vsc-input panel-input-compact" id="panelArrayColStep" type="number" min="0" max="500" title="Gap between columns (0 = adjacent, fields touch each other)">
+        <span class="panel-label">V Step</span>
+        <input class="vsc-input panel-input-compact" id="panelArrayRowStep" type="number" min="0" max="99" title="Gap between rows (0 = adjacent rows)">
+      </div>
+    </div>
   </div>
 </div>
 
@@ -139,6 +193,9 @@
 <div id="ctxMenu">
   <div class="ctx-item" id="ctxGoToDef">Go to Definition</div>
   <div class="ctx-sep"></div>
+  <div class="ctx-item" id="ctxGroup">Group</div>
+  <div class="ctx-item" id="ctxUngroup">Ungroup</div>
+  <div class="ctx-sep" id="ctxGroupSep"></div>
   <div class="ctx-item" id="ctxDelete">Delete</div>
 </div>
 
@@ -187,14 +244,31 @@
     </div>
   </div>
 
-  <!-- Arrays (placeholder — not yet implemented) -->
+  <!-- Arrays -->
   <div class="palette-col">
     <div class="palette-col-header">Arrays</div>
-    <div class="palette-item" data-ftype="array" data-direction="horizontal" data-length="8">
-      <span class="palette-item-size">H</span><span class="palette-item-preview">→ Array ×8</span>
+    <div class="palette-array-row">
+      <div class="palette-item" data-ftype="array" data-direction="horizontal" data-length="8">
+        <span class="palette-item-size">H</span><span class="palette-item-preview">→ Array</span>
+      </div>
+      <input class="palette-count-input" data-direction="horizontal" type="number" min="1" max="5" value="3" title="Number of elements">
     </div>
-    <div class="palette-item" data-ftype="array" data-direction="vertical" data-length="8">
-      <span class="palette-item-size">V</span><span class="palette-item-preview">↓ Array ×8</span>
+    <div class="palette-array-row">
+      <div class="palette-item" data-ftype="array" data-direction="vertical" data-length="8">
+        <span class="palette-item-size">V</span><span class="palette-item-preview">↓ Array</span>
+      </div>
+      <input class="palette-count-input" data-direction="vertical" type="number" min="1" max="99" value="3" title="Number of elements">
+    </div>
+  </div>
+
+  <!-- Outlined Labels -->
+  <div class="palette-col">
+    <div class="palette-col-header">Outlined</div>
+    <div class="palette-item" data-ftype="outline" data-length="8">
+      <span class="palette-item-size">8</span><span class="palette-item-preview palette-outline-preview">Label</span>
+    </div>
+    <div class="palette-item" data-ftype="outline-var" data-length="8">
+      <span class="palette-item-size">8</span><span class="palette-item-preview palette-outline-preview">Variable</span>
     </div>
   </div>
 
@@ -202,13 +276,14 @@
   <div class="palette-col">
     <div class="palette-col-header">Other</div>
     <div class="palette-item" data-ftype="password" data-length="8">
-      <span class="palette-item-size">8</span><span class="palette-item-preview">■■■■■■■■</span>
+      <span class="palette-item-size">8</span><span class="palette-item-preview">■■■■■■■■ psw</span>
     </div>
   </div>
 
 </div>
 
 <script>window.__BMS_SOURCE__ = "{{SOURCE}}";</script>
+<script id="bmsConfigData" type="application/json">{{CONFIG}}</script>
 <script src="{{JS_URI}}"></script>
 </body>
 </html>

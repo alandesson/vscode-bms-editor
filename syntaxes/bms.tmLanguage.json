@@ -53,7 +53,7 @@
         "constants": {
             "patterns": [
                 {
-                    "match": "\\b(TRUE|3270|3270-2|FALSE|ON|OFF|NULL|ASKIP|NORM|UNPROT|PROT|BRT|NUM|FINAL|FREEKB|AUTO|COBOL|INOUT|YES|NO)\\b",
+                    "match": "\\b(TRUE|3270|3270-2|ALT|ALL|FALSE|ON|OFF|NULL|NUM|FINAL|FREEKB|AUTO|COBOL|INOUT|YES|NO)\\b",
                     "name": "constant.language.bms"
                 },
                 {
@@ -66,6 +66,14 @@
                 },
                 {
                     "match": "\\b(BLUE|GREEN|WHITE|CYAN|RED|YELLOW|MAGENTA|BLACK)\\b",
+                    "name": "constant.language.color.bms"
+                },
+                {
+                    "match": "\\b(BOX|OVER|UNDER|LEFT|RIGHT)\\b",
+                    "name": "constant.language.color.bms"
+                },
+                {
+                    "match": "\\b(IC|FSET|ASKIP|NORM|UNPROT|PROT|BRT|DRK)\\b",
                     "name": "constant.language.color.bms"
                 }
             ]

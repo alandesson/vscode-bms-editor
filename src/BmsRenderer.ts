@@ -18,7 +18,15 @@ export function openBmsRenderer(context: vscode.ExtensionContext, document: vsco
     const bmsSource = document.getText();
     const fileName = document.uri.path.split('/').pop()?.replace(/\.bms$/i, '') ?? 'BMS';
 
-    panel.webview.html = getWebviewContent(context, panel.webview, fileName, bmsSource);
+    // Load persisted UI config
+    const savedConfig = {
+        fill:       context.workspaceState.get<string>('bmsRenderer.fill',       'empty'),
+        sync:       context.workspaceState.get<boolean>('bmsRenderer.sync',      false),
+        autoResize: context.workspaceState.get<boolean>('bmsRenderer.autoResize',false),
+        theme:      context.globalState.get<string>('bmsRenderer.theme',         'dark'),
+    };
+
+    panel.webview.html = getWebviewContent(context, panel.webview, fileName, bmsSource, savedConfig);
 
     // Prevent echo-back when we ourselves apply a WorkspaceEdit
     let applyingSync = false;
@@ -35,6 +43,13 @@ export function openBmsRenderer(context: vscode.ExtensionContext, document: vsco
     panel.webview.onDidReceiveMessage(async message => {
         if (message.command === 'revealField') {
             revealFieldInDocument(document, message.fieldId);
+        } else if (message.command === 'saveConfig') {
+            // Persist per-workspace settings
+            if (message.fill       !== undefined) { await context.workspaceState.update('bmsRenderer.fill',       message.fill); }
+            if (message.sync       !== undefined) { await context.workspaceState.update('bmsRenderer.sync',       message.sync); }
+            if (message.autoResize !== undefined) { await context.workspaceState.update('bmsRenderer.autoResize', message.autoResize); }
+            // Persist global setting
+            if (message.theme      !== undefined) { await context.globalState.update('bmsRenderer.theme',         message.theme); }
         } else if (message.command === 'saveBms') {
             await vscode.workspace.fs.writeFile(
                 document.uri,
@@ -89,7 +104,8 @@ function getWebviewContent(
     context: vscode.ExtensionContext,
     webview: vscode.Webview,
     fileName: string,
-    bmsSource: string
+    bmsSource: string,
+    savedConfig: { fill: string; sync: boolean; autoResize: boolean; theme: string }
 ): string {
     const htmlPath = path.join(context.extensionPath, 'src', 'media', 'renderer.html');
 
@@ -104,6 +120,7 @@ function getWebviewContent(
     html = html
         .replaceAll('{{TITLE}}', fileName)
         .replace('"{{SOURCE}}"', JSON.stringify(bmsSource))
+        .replace('>{{CONFIG}}<', `>${JSON.stringify(savedConfig)}<`)
         .replace('{{CSS_URI}}', cssUri.toString())
         .replace('{{JS_URI}}', jsUri.toString());
 
