@@ -2,6 +2,7 @@
 
 VS Code extension for editing Mainframe BMS maps with both source and visual rendering.
 
+
 ## What the Extension Does
 
 This extension provides:
@@ -177,16 +178,6 @@ The renderer remembers these settings between sessions:
 - Auto-resize
 - Theme
 
-## Generated BMS Format
-
-The generator outputs:
-
-- `DFHMSD` header macros
-- `DFHMDI` map definition
-- split `DFHMDF` field definitions with continuation lines
-- blank labels for ASKIP fields
-- final trailer with `DFHMSD TYPE=FINAL` and `END`
-
 ## Keyboard and Mouse Shortcuts
 
 Supported shortcuts include:
@@ -209,15 +200,6 @@ The toolbar also lets you control:
 - `Lines`: number of BMS rows in the grid
 - `Cols`: number of BMS columns in the grid
 - `Theme`: light or dark grid theme
-
-## Development Notes
-
-If you are running the extension from source:
-
-1. Install dependencies with `npm install`.
-2. Start the watcher with `npm run watch`.
-3. Press `F5` in VS Code to open the Extension Development Host.
-4. Open a `.bms` file and launch the renderer.
 
 ## Limitations
 
