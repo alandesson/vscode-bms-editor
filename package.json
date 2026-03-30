@@ -2,9 +2,9 @@
   "name": "bms-renderer",
   "publisher": "AlandessonLinhares",
   "icon": "resources/bms-logo.png",
-  "displayName": "bms-renderer",
+  "displayName": "BMS Renderer",
   "description": "BMS renderer and language support ",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "engines": {
     "vscode": "^1.109.0"
   },
