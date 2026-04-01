@@ -18,25 +18,35 @@
   "activationEvents": [],
   "main": "./dist/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "BMS Renderer",
+      "properties": {
+        "bms-renderer.suppressConflictWarning": {
+          "type": "boolean",
+          "default": false,
+          "description": "Suppress the warning shown when a conflicting mainframe extension (e.g. IBM Z Open Editor) is detected. The warning explains how to restore proper syntax highlighting and renderer access."
+        }
+      }
+    },
     "menus": {
       "editor/title": [
         {
           "command": "bms-renderer.render",
-          "when": "resourceLangId == bms",
+          "when": "resourceLangId == bms || resourceExtname == .bms || resourceExtname == .bbms",
           "group": "navigation"
         }
       ],
       "explorer/context": [
         {
           "command": "bms-renderer.render",
-          "when": "resourceExtname == .bms",
+          "when": "resourceExtname == .bms || resourceExtname == .bbms",
           "group": "navigation"
         }
       ],
       "editor/context": [
         {
           "command": "bms-renderer.render",
-          "when": "resourceLangId == bms",
+          "when": "resourceLangId == bms || resourceExtname == .bms || resourceExtname == .bbms",
           "group": "navigation"
         }
       ]
@@ -52,7 +62,7 @@
       {
         "id": "bms",
         "aliases": ["BMS", "bms"],
-        "extensions": [".bms"],
+        "extensions": [".bms", ".bbms"],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -71,7 +81,12 @@
           "continuation": ["markup.bold.bms"]
         }
       }
-    ]
+    ],
+    "configurationDefaults": {
+      "files.associations": {
+        "*.bbms": "bms"
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

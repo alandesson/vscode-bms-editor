@@ -41,6 +41,10 @@
   <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;" title="Automatically grow label fields to fit the text you type (text is truncated if another field would be overlapped)">
     <input type="checkbox" id="autoResizeChk"> Auto-resize
   </label>
+  <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;" title="Optional prefix applied in generated variable comments, for example PREFIX-ID. Leave empty to disable.">
+    Prefix
+    <input class="vsc-input" id="prefixInput" type="text" maxlength="25" placeholder="PREFIX" style="width:180px;" title="Optional prefix applied in generated variable comments, for example PREFIX-ID. Leave empty to disable." />
+  </label>
 </div>
 
 <!-- ===================== SCROLL AREA ============ -->
@@ -48,10 +52,11 @@
   <!-- render view -->
   <div id="renderView">
     <div class="grid-wrapper" id="gridWrapper">
-      <div class="bms-grid" id="bmsGrid"></div>
+      <div class="bms-grid" id="bmsGrid" tabindex="-1"></div>
       <canvas id="selectionOverlay"></canvas>
     </div>
     <div id="gridMsg"></div>
+    <div id="diagnosticsBar"></div>
   </div>
 
   <!-- source view -->
@@ -68,12 +73,18 @@
       <input class="vsc-input panel-input-grow" id="panelId" type="text" maxlength="25" title="Up to 25 characters. Letters, numbers, and hyphens only." />
     </div>
     <div class="panel-group panel-group-stretch panel-group-metrics">
-      <span class="panel-label">Row</span>
-      <input class="vsc-input panel-input-compact" id="panelRow" type="number" />
-      <span class="panel-label">Col</span>
-      <input class="vsc-input panel-input-compact" id="panelCol" type="number" />
-      <span class="panel-label">Len</span>
-      <input class="vsc-input panel-input-compact" id="panelLen" type="number" />
+      <div class="panel-metric-item">
+        <span class="panel-label">Row</span>
+        <input class="vsc-input panel-input-compact" id="panelRow" type="number" />
+      </div>
+      <div class="panel-metric-item">
+        <span class="panel-label">Col</span>
+        <input class="vsc-input panel-input-compact" id="panelCol" type="number" />
+      </div>
+      <div class="panel-metric-item">
+        <span class="panel-label">Length</span>
+        <input class="vsc-input panel-input-compact" id="panelLen" type="number" />
+      </div>
     </div>
     <div class="panel-group panel-group-stretch" id="panelTextGroup" style="display:none;">
       <span class="panel-label">Text</span>
@@ -160,7 +171,7 @@
         <input type="checkbox" id="panelOlRight"> Right
       </label>
     </div>
-    <div class="panel-group panel-group-stretch" id="panelStopperRow" style="display:none;">
+    <div class="panel-group panel-group-stretch" id="panelStopperRow" style="display:none;flex:.3 1 0">
       <label style="display:flex;align-items:center;gap:3px;font-size:12px;" title="Emit an ASKIP LENGTH=0 stopper field immediately to the right of this UNPROT field">
         <input type="checkbox" id="panelStopper"> Stopper
       </label>

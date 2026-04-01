@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { parseBmsFields } from './BmsDocument';
 
 export const diagnosticCollection = vscode.languages.createDiagnosticCollection('bms');
 
@@ -169,6 +170,71 @@ export function validateBmsDocument(document: vscode.TextDocument) {
                 )
             );
         }
+    }
+
+    try {
+        const parsedFields = parseBmsFields(document.getText());
+        const duplicateGroups = new Map<string, typeof parsedFields>();
+
+        for (const field of parsedFields) {
+            if (field.askip || field.isArray || !field.logicalId) {
+                continue;
+            }
+
+            const key = field.logicalId.toUpperCase();
+            const existing = duplicateGroups.get(key) ?? [];
+            existing.push(field);
+            duplicateGroups.set(key, existing);
+        }
+
+        duplicateGroups.forEach((group, logicalId) => {
+            if (group.length < 2) {
+                return;
+            }
+
+            group.forEach(field => {
+                diagnostics.push(
+                    new vscode.Diagnostic(
+                        new vscode.Range(field.idLine, field.idStart, field.idLine, field.idEnd),
+                        `Duplicate variable ID "${logicalId}". Each non-ASKIP variable ID must be unique.`,
+                        vscode.DiagnosticSeverity.Error
+                    )
+                );
+            });
+        });
+
+        const icFields = parsedFields.filter(field => field.ic);
+        if (icFields.length > 1) {
+            const summary = icFields
+                .map(field => field.logicalId || `POS=(${field.row + 1},${field.col + 1})`)
+                .join(', ');
+            const effectiveField = icFields[icFields.length - 1];
+            const message = `Multiple IC fields found: ${summary}. The last one ("${effectiveField.logicalId || `POS=(${effectiveField.row + 1},${effectiveField.col + 1})`}") is where the cursor starts.`;
+
+            icFields.forEach(field => {
+                const lineLen = field.startLine < document.lineCount
+                    ? document.lineAt(field.startLine).text.length
+                    : 1;
+                diagnostics.push(
+                    new vscode.Diagnostic(
+                        new vscode.Range(field.startLine, 0, field.startLine, Math.max(1, lineLen)),
+                        message,
+                        vscode.DiagnosticSeverity.Warning
+                    )
+                );
+            });
+        } else if (icFields.length === 0) {
+            const firstLineLen = document.lineCount > 0 ? document.lineAt(0).text.length : 0;
+            diagnostics.push(
+                new vscode.Diagnostic(
+                    new vscode.Range(0, 0, 0, Math.max(1, firstLineLen)),
+                    'No IC field is set. The default cursor location is the first position of the screen.',
+                    vscode.DiagnosticSeverity.Warning
+                )
+            );
+        }
+    } catch (_err) {
+        // Parsing errors must not prevent other diagnostics from being reported
     }
 
     diagnosticCollection.set(document.uri, diagnostics);

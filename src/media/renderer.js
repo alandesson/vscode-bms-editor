@@ -78,6 +78,7 @@ function getCurrentConfig() {
     fill: fillMode,
     sync: !!document.getElementById('autoSyncChk')?.checked,
     autoResize: !!document.getElementById('autoResizeChk')?.checked,
+    prefix: document.getElementById('prefixInput')?.value || '',
     theme: gridTheme,
   };
 }
@@ -97,6 +98,7 @@ let selectedStopperId = null; // index of the UNPROT field whose stopper is sele
 
 let fillMode      = 'empty';
 let autoResize    = false;    // auto-grow ASKIP label fields while typing
+let idPrefix      = '';
 let clipboard     = null;     // copy-paste buffer: [{...field, relRow, relCol}]
 let lastMouseGrid = null;     // {row,col} when mouse is over grid, else null
 let _fieldIdCounter = 0;      // counter for generating unique paste IDs
@@ -119,14 +121,40 @@ function arrLabel(arrayId, index) {
 // Emit the BMS comment line preceding each array field:
 // * {arrayId padded to col 35}{arrayId}
 // col 1='*', col 2=' ', col 3=first id start, col 35=second id start (1-indexed)
+function fieldCommentLine(leftId, rightId) {
+  return '* ' + leftId.padEnd(32, ' ').slice(0, 32) + rightId;
+}
+
 function arrayCommentLine(arrayId) {
-  return '* ' + arrayId.padEnd(32, ' ').slice(0, 32) + arrayId;
+  return fieldCommentLine(arrayId, arrayId);
 }
 
 function sanitizeFieldId(value) {
   return String(value)
     .replace(/[^A-Za-z0-9-]/g, '')
     .slice(0, 25);
+}
+
+function sanitizePrefix(value) {
+  return sanitizeFieldId(value).toUpperCase();
+}
+
+function applyPrefixToId(value) {
+  if (!idPrefix || !value) return value;
+  return `${idPrefix}-${value}`;
+}
+
+function stripPrefixFromId(value, prefixHint = null) {
+  const prefix = prefixHint || idPrefix;
+  if (!prefix) return value;
+  const needle = `${prefix}-`;
+  return value.toUpperCase().startsWith(needle.toUpperCase())
+    ? value.slice(needle.length)
+    : value;
+}
+
+function isVariableField(field) {
+  return !field.askip;
 }
 
 // drag/resize state
@@ -156,7 +184,7 @@ const Parser = (() => {
 
   function parseFields(source) {
     // Two-pass: find every DFHMDF start position, then slice source into blocks.
-    const labelRe     = /^(\w{1,7})\s+DFHMDF\b/gm;
+    const labelRe     = /^([A-Za-z][A-Za-z0-9-]{0,6})\s+DFHMDF\b/gm;
     const unlabeledRe = /^\s{2,}DFHMDF\b/gm;
     const starts  = [];
     let m;
@@ -168,38 +196,37 @@ const Parser = (() => {
     }
     starts.sort((a, b) => a.index - b.index);
 
-    // Detect array comment lines: "* {id}{spaces}{id}" where id is at col 3 and col 35
-    // Build a map: charIndex of a DFHMDF label line → arrayId from the preceding comment
+    // Detect comment lines in the form "* LEFT-ID{spaces}RIGHT-ID".
+    // Arrays repeat the same ID twice. Long IDs and prefixes use a unique right-side ID.
+    // Build a map: charIndex of a DFHMDF label line → parsed preceding comment.
     const sourceLines = source.split('\n');
     const lineCharStart = [];
     let _cp = 0;
     for (const ln of sourceLines) { lineCharStart.push(_cp); _cp += ln.length + 1; }
-    const arrayCommentForLine = new Map(); // nextLineCharStart → arrayId
+    const commentForLine = new Map(); // nextLineCharStart → { leftId, rightId, isArray }
     for (let li = 0; li < sourceLines.length; li++) {
       const ln = sourceLines[li];
       if (ln.length >= 3 && ln[0] === '*' && ln[1] === ' ') {
-        const idM = ln.slice(2).match(/^(\S+)/);
-        if (idM) {
-          const id = idM[1];
-          // Second occurrence must start at position 34 (0-indexed) = column 35
-          if (ln.length >= 34 + id.length &&
-              ln.slice(34, 34 + id.length) === id &&
-              (ln.length === 34 + id.length || ln[34 + id.length] === ' ')) {
-            if (li + 1 < sourceLines.length) {
-              arrayCommentForLine.set(lineCharStart[li + 1], id);
-            }
-          }
+        const leftM = ln.slice(2).match(/^(\S+)/);
+        const rightM = ln.length > 34 ? ln.slice(34).match(/^(\S+)/) : null;
+        if (leftM && rightM && li + 1 < sourceLines.length) {
+          commentForLine.set(lineCharStart[li + 1], {
+            leftId: leftM[1],
+            rightId: rightM[1],
+            isArray: leftM[1] === rightM[1],
+          });
         }
       }
     }
-    starts.forEach(s => { s.arrayId = arrayCommentForLine.get(s.index) || null; });
+    starts.forEach(s => { s.comment = commentForLine.get(s.index) || null; });
 
     const result = [];
     for (let i = 0; i < starts.length; i++) {
       const blockStart = starts[i].index;
       const blockEnd   = i + 1 < starts.length ? starts[i + 1].index : source.length;
       const block      = source.slice(blockStart, blockEnd);
-      const id         = starts[i].id;
+      const sourceLabel = starts[i].id;
+      const comment = starts[i].comment;
 
       const pos    = block.match(/POS=\((\d+),(\d+)\)/);
       const len    = block.match(/LENGTH=(\d+)/i);
@@ -242,7 +269,7 @@ const Parser = (() => {
       if (!pos || !len) continue;
 
       result.push({
-        id,
+        id: comment && !comment.isArray ? comment.rightId : sourceLabel,
         row:         +pos[1] - 1,
         col:         +pos[2] - 1,
         length:      +len[1],
@@ -257,9 +284,43 @@ const Parser = (() => {
         color:     parsedColor,
         highlight: parsedHilit,
         outline:   parsedOutline,
-        _srcArrayId: starts[i].arrayId, // temporary — resolved in post-processing
+        _sourceLabel: sourceLabel,
+        _rawCommentId: comment && !comment.isArray ? comment.rightId : null,
+        _srcArrayId: comment && comment.isArray ? comment.leftId : null, // temporary — resolved in post-processing
       });
     }
+
+    const configuredPrefix = idPrefix || null;
+    // Infer prefix from comments: split each comment rightId at the first hyphen;
+    // if all first-parts are equal across all non-array commented fields, that is the prefix.
+    const commentedVarFields = result.filter(f => f._rawCommentId && !f._srcArrayId);
+    let inferredPrefix = null;
+    if (!configuredPrefix && commentedVarFields.length >= 1) {
+      const firstParts = commentedVarFields.map(f => {
+        const hyphenIdx = f._rawCommentId.indexOf('-');
+        return hyphenIdx > 0 ? f._rawCommentId.slice(0, hyphenIdx) : null;
+      });
+      if (firstParts.every(p => p !== null)) {
+        const firstUpper = firstParts[0].toUpperCase();
+        if (firstParts.every(p => p.toUpperCase() === firstUpper)) {
+          inferredPrefix = firstParts[0];
+        }
+      }
+    }
+    const effectivePrefix = configuredPrefix || inferredPrefix;
+    // If a prefix was inferred from the file and none was configured, persist it so
+    // auto-sync can re-emit the correct comment lines on the next save.
+    if (inferredPrefix && !idPrefix) {
+      idPrefix = inferredPrefix;
+      const _prefixInputEl = document.getElementById('prefixInput');
+      if (_prefixInputEl) _prefixInputEl.value = idPrefix;
+    }
+
+    result.forEach(f => {
+      if (f._rawCommentId && !f._srcArrayId) {
+        f.id = stripPrefixFromId(f._rawCommentId, effectivePrefix);
+      }
+    });
 
     // Post-process: detect ASKIP LENGTH=0 stopper fields.
     const stopperEntries = result.filter(f => f.askip && f.length === 0);
@@ -284,6 +345,8 @@ const Parser = (() => {
         arrayGroups.get(f._srcArrayId).push(i);
       }
       delete f._srcArrayId;
+      delete f._sourceLabel;
+      delete f._rawCommentId;
     });
     arrayGroups.forEach((indices, arrayId) => {
       const gid = _newGroupId();
@@ -954,8 +1017,13 @@ const Interaction = (() => {
     }
 
     if (selectedIds.size !== 1) return null;
-    if (Math.abs(mx - fx)        < 8) return 'resize-left';
-    if (Math.abs(mx - (fx + fw)) < 8) return 'resize-right';
+    // Scale the handle detection zone proportionally to the field width so small
+    // fields (length 1–2) still have a clickable middle area for plain selection.
+    const handleZone = Math.max(2, Math.min(8, Math.floor(fw / 3)));
+    if (Math.abs(mx - fx) < handleZone) return 'resize-left';
+    // Right handle: entirely within the field's colored area (never in the stopper cell).
+    // Use 2× the zone width so the grab target is comfortable.
+    if (mx >= fx + fw - handleZone * 2 && mx < fx + fw) return 'resize-right';
     return null;
   }
 
@@ -974,6 +1042,17 @@ const Interaction = (() => {
         const dummy = selArr[0];
         const handle = getResizeHandle(e, fields.indexOf(dummy), fields, mapDef);
         if (handle) { Cursor.set(handle === 'resize-bottom' ? 'ns-resize' : handle); return; }
+      }
+      // Check if hovering the edge of a single selected non-array field.
+      // getResizeHandle's right zone is entirely within the field, so stopper cells
+      // correctly return null here and show a default cursor.
+      if (selectedIds.size === 1) {
+        const selIdx = [...selectedIds][0];
+        const selF   = fields[selIdx];
+        if (selF && !selF.isArray) {
+          const edgeHandle = getResizeHandle(e, selIdx, fields, mapDef);
+          if (edgeHandle) { Cursor.set(edgeHandle); return; }
+        }
       }
       Cursor.set('default'); return;
     }
@@ -1000,15 +1079,20 @@ const Interaction = (() => {
     if (e.button !== 0) return;
     if (InlineEditor.isActive()) return;
 
-    // Blur any focused toolbar/panel control (e.g. fill dropdown) so that
-    // keyboard shortcuts like Delete work immediately after clicking the grid.
+    // Ensure the grid holds keyboard focus so Delete/arrow keys work even if the
+    // VS Code text editor was focused before this click.
+    const bmsGridEl = document.getElementById('bmsGrid');
+    if (bmsGridEl) bmsGridEl.focus({ preventScroll: true });
+    // Also blur any focused toolbar/panel control inside the webview.
     const ae = document.activeElement;
-    if (ae && ae !== document.body && !ae.closest('#bmsGrid')) ae.blur();
+    if (ae && ae !== document.body && ae !== bmsGridEl && !ae.closest('#bmsGrid')) ae.blur();
 
     const { col, row, px, py } = getCellCoords(e, mapDef);
     const idx = getFieldAtCell(fields, row, col);
 
-    // Clicking a stopper marker selects it; Delete then disables it
+    // Clicking a stopper marker always selects it (so Delete can toggle it off).
+    // Resize is initiated by dragging from the field's right-edge handle (within the
+    // field's colored area), not from the stopper cell.
     const _stopperCell = cells[row * mapDef.cols + col];
     if (_stopperCell && _stopperCell.dataset.stopperParent !== undefined) {
       const parentIdx = parseInt(_stopperCell.dataset.stopperParent, 10);
@@ -1031,7 +1115,7 @@ const Interaction = (() => {
       e.preventDefault();
       const f = fields[idx];
       const vscode = getVsCodeApi();
-      if (vscode) vscode.postMessage({ command: 'revealField', fieldId: f.id });
+      if (vscode) vscode.postMessage({ command: 'revealField', row: f.row, col: f.col, fieldId: f.id });
       return;
     }
 
@@ -1069,6 +1153,32 @@ const Interaction = (() => {
         Cursor.set(bbHandle === 'resize-bottom' ? 'ns-resize' : bbHandle);
         e.preventDefault();
         return;
+      }
+
+      // Edge-resize for a single selected non-array field whose edge is near the click
+      // but whose cell maps to empty space (e.g. stopper marker cell, or click just
+      // outside the left/right pixel boundary).
+      if (selectedIds.size === 1) {
+        const selIdx = [...selectedIds][0];
+        const selF   = fields[selIdx];
+        if (selF && !selF.isArray) {
+          const edgeHandle = getResizeHandle(e, selIdx, fields, mapDef);
+          if (edgeHandle === 'resize-left' || edgeHandle === 'resize-right') {
+            isDragging = true;
+            dragInfo = {
+              type: edgeHandle, fieldIdx: selIdx,
+              startX: e.clientX, startY: e.clientY,
+              origRow: selF.row, origCol: selF.col, origLen: selF.length,
+              origState: JSON.parse(JSON.stringify(fields)),
+              isArrayResize: false,
+              arrayId: null, origArrayCols: null, origArrayRows: null,
+              origColStep: null, origRowStep: null,
+            };
+            Cursor.set(edgeHandle);
+            e.preventDefault();
+            return;
+          }
+        }
       }
 
       if (!e.shiftKey) {
@@ -1654,6 +1764,56 @@ const History = (() => {
 })();
 
 /* ===========================================================
+   DIAGNOSTICS BAR
+   Shows IC and duplicate-ID issues below the grid after each render.
+   =========================================================== */
+function runDiagnostics() {
+  const bar = document.getElementById('diagnosticsBar');
+  if (!bar) return;
+
+  const items = [];
+
+  // ---- IC checks ----
+  const icFields = fields.filter(f => f.ic);
+  if (icFields.length === 0) {
+    items.push({ cls: 'diag-warning', text: '\u26a0 No IC (Insert Cursor) field is set. The cursor will start at the first position of the screen.' });
+  } else if (icFields.length > 1) {
+    const names = icFields.map(f => f.id || `POS=(${f.row + 1},${f.col + 1})`).join(', ');
+    const last  = icFields[icFields.length - 1];
+    const lastName = last.id || `POS=(${last.row + 1},${last.col + 1})`;
+    items.push({ cls: 'diag-warning', text: `\u26a0 Multiple IC fields: ${names}. The last one in the BMS ("${lastName}") is where the cursor will start.` });
+  }
+
+  // ---- Duplicate ID checks ----
+  const idMap = new Map();
+  fields.forEach(f => {
+    if (f.askip || f.isArray || !f.id) return;
+    const key = f.id.toUpperCase();
+    const group = idMap.get(key);
+    if (group) group.push(f); else idMap.set(key, [f]);
+  });
+  idMap.forEach((group, key) => {
+    if (group.length < 2) return;
+    const positions = group.map(f => `POS=(${f.row + 1},${f.col + 1})`).join(', ');
+    items.push({ cls: 'diag-error', text: `\u274c Duplicate variable ID "${group[0].id}": ${positions}. Each field must have a unique ID.` });
+  });
+
+  // Render
+  bar.innerHTML = '';
+  if (items.length === 0) {
+    bar.style.display = 'none';
+  } else {
+    bar.style.display = 'flex';
+    items.forEach(({ cls, text }) => {
+      const div = document.createElement('div');
+      div.className = `diag-item ${cls}`;
+      div.textContent = text;
+      bar.appendChild(div);
+    });
+  }
+}
+
+/* ===========================================================
    GRID MESSAGE BAR
    Displays paste errors and terminal-size warnings below the grid.
    =========================================================== */
@@ -1978,6 +2138,7 @@ function generateBmsSource() {
   const mapName = normalizeMapName(document.title || document.querySelector('.title')?.textContent || '');
 
   const out = [];
+  let longFieldCounter = 1;
   out.push(bmsLines(mapName, 'DFHMSD', [
     'TYPE=&SYSPARM',
     'MODE=INOUT',
@@ -2042,9 +2203,27 @@ function generateBmsSource() {
     // INITIAL
     if (f.initialText) attrs.push(`INITIAL='${splitInitialText(f.initialText)}'`);
 
-    // Array fields: emit comment line before each member and use numbered label
-    if (f.isArray) out.push(arrayCommentLine(f.arrayId));
-    const fieldLabel = f.askip ? '' : (f.isArray ? arrLabel(f.arrayId, f.arrayIndex) : f.id);
+    const logicalId = applyPrefixToId(f.id);
+    const needsLongIdAlias = isVariableField(f) && !f.isArray && f.id.length > 7;
+    const needsPrefixComment = isVariableField(f) && !!idPrefix;
+
+    let fieldLabel = '';
+    if (!f.askip) {
+      if (f.isArray) {
+        fieldLabel = arrLabel(f.arrayId, f.arrayIndex);
+      } else if (needsLongIdAlias) {
+        fieldLabel = 'LFLD' + String(longFieldCounter++).padStart(3, '0');
+      } else {
+        fieldLabel = f.id;
+      }
+    }
+
+    if (f.isArray) {
+      out.push(arrayCommentLine(f.arrayId));
+    } else if (needsLongIdAlias || needsPrefixComment) {
+      out.push(fieldCommentLine(fieldLabel, logicalId));
+    }
+
     out.push(bmsLines(fieldLabel, 'DFHMDF', attrs));
 
     // Emit ASKIP stopper field after UNPROT fields with stopper=true,
@@ -2117,6 +2296,9 @@ function renderBms() {
 
   // Attach interaction (re-init on every render)
   Interaction.init(mapDef, fields, cells);
+
+  // Refresh diagnostics bar
+  runDiagnostics();
 }
 
 /* ===========================================================
@@ -2386,6 +2568,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const lenInput      = document.getElementById('panelLen');
   const autoSyncChk   = document.getElementById('autoSyncChk');
   const autoResizeChk = document.getElementById('autoResizeChk');
+  const prefixInput   = document.getElementById('prefixInput');
 
   // Apply persisted config before first render
   const initialConfig = getInitialConfig();
@@ -2427,6 +2610,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function doSave() {
     const vsc = getVsCodeApi();
     if (vsc) vsc.postMessage({ command: 'saveBms', content: generateBmsSource() });
+    // Refresh diagnostics after save so the bar stays current
+    runDiagnostics();
   }
   document.getElementById('saveBtn').addEventListener('click', doSave);
 
@@ -2668,10 +2853,10 @@ document.addEventListener('DOMContentLoaded', () => {
   ctxGoToDef.addEventListener('click', e => {
     e.stopPropagation();
     if (ctxFieldIdx < 0 || ctxFieldIdx >= fields.length) { hideCtxMenu(); return; }
-    const fieldId = fields[ctxFieldIdx].id; // capture before hideCtxMenu clears ctxFieldIdx
+    const field = fields[ctxFieldIdx];
     hideCtxMenu();
     const vsc = getVsCodeApi();
-    if (vsc) vsc.postMessage({ command: 'revealField', fieldId });
+    if (vsc) vsc.postMessage({ command: 'revealField', row: field.row, col: field.col, fieldId: field.id });
   });
 
   ctxDelete.addEventListener('click', e => {
@@ -2983,16 +3168,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  /* -- renderer→file: wrap FieldRenderer so every mutation schedules a debounced sync -- */
+  /* -- renderer→file: wrap FieldRenderer so every mutation schedules a debounced sync and refreshes diagnostics -- */
   const _origApplyAll     = FieldRenderer.applyAll;
   const _origRefreshField = FieldRenderer.refreshField;
-  FieldRenderer.applyAll     = function(...a) { _origApplyAll(...a);     scheduleSyncToFile(); };
-  FieldRenderer.refreshField = function(...a) { _origRefreshField(...a); scheduleSyncToFile(); };
+  FieldRenderer.applyAll     = function(...a) { _origApplyAll(...a);     scheduleSyncToFile(); runDiagnostics(); };
+  FieldRenderer.refreshField = function(...a) { _origRefreshField(...a); scheduleSyncToFile(); runDiagnostics(); };
 
   /* -- auto-resize toggle -- */
   autoResizeChk.addEventListener('change', e => {
     autoResize = e.target.checked;
     persistConfig({ autoResize });
+  });
+
+  prefixInput.addEventListener('input', e => {
+    const sanitized = sanitizePrefix(e.target.value);
+    if (sanitized !== e.target.value) {
+      e.target.value = sanitized;
+    }
+  });
+
+  prefixInput.addEventListener('change', e => {
+    idPrefix = sanitizePrefix(e.target.value);
+    e.target.value = idPrefix;
+    persistConfig({ prefix: idPrefix });
   });
 
   // Wire auto-sync toggle to persist changes too

@@ -7,3 +7,13 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## [1.0.0]
 
 - Initial release
+
+## [1.0.1]
+
+- Add Icon and changed packaging configs
+
+## [1.0.2]
+
+- Fixed Go to Definition, Visual Bugs, Resize and Select 
+- Added support for long IDs
+- Added support to prefixing

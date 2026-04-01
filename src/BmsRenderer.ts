@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { findBmsFieldStartLine } from './BmsDocument';
 
 export function openBmsRenderer(context: vscode.ExtensionContext, document: vscode.TextDocument) {
     const panel = vscode.window.createWebviewPanel(
@@ -16,13 +17,15 @@ export function openBmsRenderer(context: vscode.ExtensionContext, document: vsco
     );
 
     const bmsSource = document.getText();
-    const fileName = document.uri.path.split('/').pop()?.replace(/\.bms$/i, '') ?? 'BMS';
+    const fileName = document.uri.path.split('/').pop()?.replace(/\.(?:bms|bbms)$/i, '') ?? 'BMS';
 
     // Load persisted UI config
     const savedConfig = {
         fill:       context.workspaceState.get<string>('bmsRenderer.fill',       'empty'),
         sync:       context.workspaceState.get<boolean>('bmsRenderer.sync',      false),
         autoResize: context.workspaceState.get<boolean>('bmsRenderer.autoResize',false),
+        prefixEnabled: context.workspaceState.get<boolean>('bmsRenderer.prefixEnabled', false),
+        prefix: context.workspaceState.get<string>('bmsRenderer.prefix', ''),
         theme:      context.globalState.get<string>('bmsRenderer.theme',         'dark'),
     };
 
@@ -42,19 +45,32 @@ export function openBmsRenderer(context: vscode.ExtensionContext, document: vsco
     // Handle messages from the webview
     panel.webview.onDidReceiveMessage(async message => {
         if (message.command === 'revealField') {
-            revealFieldInDocument(document, message.fieldId);
+            revealFieldInDocument(document, Number(message.row), Number(message.col), message.fieldId);
         } else if (message.command === 'saveConfig') {
             // Persist per-workspace settings
             if (message.fill       !== undefined) { await context.workspaceState.update('bmsRenderer.fill',       message.fill); }
             if (message.sync       !== undefined) { await context.workspaceState.update('bmsRenderer.sync',       message.sync); }
             if (message.autoResize !== undefined) { await context.workspaceState.update('bmsRenderer.autoResize', message.autoResize); }
+            if (message.prefixEnabled !== undefined) { await context.workspaceState.update('bmsRenderer.prefixEnabled', !!message.prefixEnabled); }
+            if (message.prefix !== undefined) { await context.workspaceState.update('bmsRenderer.prefix', String(message.prefix)); }
             // Persist global setting
             if (message.theme      !== undefined) { await context.globalState.update('bmsRenderer.theme',         message.theme); }
         } else if (message.command === 'saveBms') {
-            await vscode.workspace.fs.writeFile(
-                document.uri,
-                Buffer.from(message.content as string, 'utf8')
-            );
+            const newContent = message.content as string;
+            applyingSync = true;
+            try {
+                const edit = new vscode.WorkspaceEdit();
+                const fullRange = new vscode.Range(
+                    document.positionAt(0),
+                    document.positionAt(document.getText().length)
+                );
+                edit.replace(document.uri, fullRange, newContent);
+                await vscode.workspace.applyEdit(edit);
+                // Also write to disk so the file is saved, not just dirty-flagged
+                await document.save();
+            } finally {
+                applyingSync = false;
+            }
             vscode.window.showInformationMessage(
                 `Saved: ${path.basename(document.uri.fsPath)}`
             );
@@ -77,27 +93,21 @@ export function openBmsRenderer(context: vscode.ExtensionContext, document: vsco
     }, undefined, context.subscriptions);
 }
 
-function revealFieldInDocument(document: vscode.TextDocument, fieldId: string) {
-    const text  = document.getText();
-    const lines = text.split('\n');
-    // Find the line where fieldId appears as a DFHMDF label (first column token)
-    const labelRe = new RegExp(`^(${escapeRegex(fieldId)})\\s+DFHMDF\\b`, 'im');
-    for (let i = 0; i < lines.length; i++) {
-        if (labelRe.test(lines[i])) {
-            const range = new vscode.Range(i, 0, i, lines[i].length);
-            vscode.window.showTextDocument(document, {
-                viewColumn: vscode.ViewColumn.One,
-                selection: range,
-                preserveFocus: false,
-            });
-            return;
-        }
+function revealFieldInDocument(document: vscode.TextDocument, row: number, col: number, fieldId?: string) {
+    const startLine = findBmsFieldStartLine(document.getText(), row, col);
+    if (startLine === undefined) {
+        const fieldLabel = fieldId ? `Field "${fieldId}"` : `Field at POS=(${row + 1},${col + 1})`;
+        vscode.window.showInformationMessage(`${fieldLabel} not found in source.`);
+        return;
     }
-    vscode.window.showInformationMessage(`Field "${fieldId}" not found in source.`);
-}
 
-function escapeRegex(s: string): string {
-    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const lineText = document.lineAt(startLine).text;
+    const range = new vscode.Range(startLine, 0, startLine, lineText.length);
+    vscode.window.showTextDocument(document, {
+        viewColumn: vscode.ViewColumn.One,
+        selection: range,
+        preserveFocus: false,
+    });
 }
 
 function getWebviewContent(

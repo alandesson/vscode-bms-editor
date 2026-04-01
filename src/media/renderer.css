@@ -153,12 +153,10 @@ body {
 
 /* Field cell: slightly highlighted background by default */
 .grid-cell.is-field {
-  cursor: pointer;
 }
 
 .grid-cell.is-stopper {
   color: #777;
-  cursor: pointer;
   opacity: 0.9;
 }
 
@@ -191,20 +189,31 @@ body {
 .panel-group {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 1px;
   min-width: 0;
 }
 
 .panel-group-stretch {
   flex: 1 1 0;
+  flex-wrap: wrap;
+  padding: 0px 0px;
 }
 
 .panel-group-id {
   flex: 0.8 1 0;
+  align-items: flex-start;
 }
 
 .panel-group-metrics {
   flex: 1 1 0;
+  align-items: flex-start;
+}
+
+.panel-metric-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-right: 1em;
 }
 
 .panel-input-grow,
@@ -487,6 +496,30 @@ body {
   color: #ff8888;
 }
 #gridMsg.warning {
+  background: rgba(200, 160, 40, 0.2);
+  border: 1px solid #cc9933;
+  color: #ffcc66;
+}
+
+/* ---- Diagnostics bar (IC / duplicate-ID notices) ---- */
+#diagnosticsBar {
+  margin-top: 6px;
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+}
+#diagnosticsBar .diag-item {
+  padding: 4px 10px;
+  border-radius: 3px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+#diagnosticsBar .diag-item.diag-error {
+  background: rgba(200, 40, 40, 0.2);
+  border: 1px solid #cc3333;
+  color: #ff8888;
+}
+#diagnosticsBar .diag-item.diag-warning {
   background: rgba(200, 160, 40, 0.2);
   border: 1px solid #cc9933;
   color: #ffcc66;
